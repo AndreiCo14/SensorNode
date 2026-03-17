@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SensorNode</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:monospace;font-size:13px;background:#111;color:#ccc;display:flex;flex-direction:column;min-height:100vh}
+header{background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #333}
+header h1{font-size:15px;color:#7eb8f7;letter-spacing:1px}
+#devname{color:#aaa;font-size:12px}
+#refresh-btn{margin-left:auto;background:#23395d;color:#7eb8f7;border:1px solid #7eb8f7;padding:3px 10px;cursor:pointer;border-radius:3px}
+#refresh-btn:hover{background:#2d4a7a}
+main{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:12px;flex:1}
+@media(max-width:640px){main{grid-template-columns:1fr}}
+section{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:4px;padding:12px}
+section h2{font-size:11px;color:#7eb8f7;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #2a2a2a}
+.full{grid-column:1/-1}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
+.stat{background:#111;border:1px solid #252525;border-radius:3px;padding:6px 8px}
+.stat .label{color:#666;font-size:10px;margin-bottom:2px}
+.stat .value{color:#e0e0e0;font-size:13px}
+.ok{color:#4caf50}
+.err{color:#e53935}
+.warn{color:#ffa726}
+.form-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.form-row label{color:#888;width:90px;flex-shrink:0;font-size:11px}
+.form-row input[type=number],.form-row input[type=text],.form-row input[type=password]{background:#111;border:1px solid #333;color:#ddd;padding:3px 6px;border-radius:2px}
+.form-row input[type=number]{width:70px}
+.form-row input[type=text],.form-row input[type=password]{width:180px}
+.form-row input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:#7eb8f7}
+textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px;border-radius:2px;min-height:120px;resize:vertical;font-family:monospace;font-size:12px}
+.btn{background:#23395d;color:#7eb8f7;border:1px solid #7eb8f7;padding:4px 12px;cursor:pointer;border-radius:3px;font-family:monospace;font-size:12px;margin-top:6px}
+.btn:hover{background:#2d4a7a}
+.btn.danger{color:#e57373;border-color:#e57373;background:#2a1515}
+.btn.danger:hover{background:#3a1f1f}
+.btn-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.msg{margin-top:6px;font-size:11px;min-height:14px}
+/* Sensor cards */
+.sensor-card{border:1px solid #2a2a2a;border-radius:3px;padding:8px;margin-bottom:8px;background:#141414}
+.sensor-card .sc-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.sensor-card .sc-type{color:#7eb8f7;font-size:12px;flex:1}
+.sensor-card .sc-fields{display:flex;flex-wrap:wrap;gap:8px}
+.sensor-card .sc-field{display:flex;align-items:center;gap:4px;font-size:11px;color:#888}
+.sensor-card .sc-field input{width:60px;background:#111;border:1px solid #333;color:#ddd;padding:2px 4px;border-radius:2px;font-size:11px}
+/* Log */
+#log{height:240px;overflow-y:auto;background:#0d0d0d;border:1px solid #222;padding:6px;border-radius:2px;display:flex;flex-direction:column}
+.log-entry{padding:1px 0;white-space:pre-wrap;word-break:break-all;line-height:1.5}
+.log-info{color:#9ecfff}
+.log-warn{color:#ffa726}
+.log-error{color:#e57373}
+.log-debug{color:#666}
+.log-ts{color:#444;font-size:11px;margin-right:6px}
+.ws-status{font-size:10px;color:#666;margin-bottom:4px}
+.ws-ok{color:#4caf50}
+.ws-err{color:#e53935}
+/* Drag */
+.draggable-section{position:relative}
+.draggable-section>h2{cursor:grab;user-select:none}
+.draggable-section>h2::before{content:'⠿\00a0';color:#444}
+.dragging{opacity:.4}
+.drag-over{outline:1px solid #7eb8f7}
+.sec-grip{position:absolute;right:4px;top:0;bottom:0;display:flex;align-items:center;cursor:ew-resize;color:#333;user-select:none;font-size:13px}
+.sec-grip:hover{color:#7eb8f7}
+</style>
+</head>
+<body>
+<header>
+  <h1>&#9650; SensorNode</h1>
+  <span id="devname"></span>
+  <button id="refresh-btn" onclick="loadState()">Refresh</button>
+</header>
+<main>
+
+  <!-- Status -->
+  <section class="full">
+    <h2>Status</h2>
+    <div class="stat-grid">
+      <div class="stat"><div class="label">Chip ID</div><div class="value" id="s-chip">—</div></div>
+      <div class="stat"><div class="label">WiFi</div><div class="value" id="s-wifi">—</div></div>
+      <div class="stat"><div class="label">MQTT</div><div class="value" id="s-mqtt">—</div></div>
+      <div class="stat"><div class="label">RSSI</div><div class="value" id="s-rssi">—</div></div>
+      <div class="stat"><div class="label">Uptime</div><div class="value" id="s-uptime">—</div></div>
+      <div class="stat"><div class="label">Active Sensors</div><div class="value" id="s-sensors">—</div></div>
+      <div class="stat"><div class="label">Readings</div><div class="value" id="s-readings">—</div></div>
+      <div class="stat"><div class="label">Free Heap</div><div class="value" id="s-heap">—</div></div>
+      <div class="stat"><div class="label">Sample Num</div><div class="value" id="s-sample">—</div></div>
+      <div class="stat"><div class="label">Tele Interval</div><div class="value" id="s-tele">—</div></div>
+      <div class="stat"><div class="label">Build</div><div class="value" id="s-build">—</div></div>
+      <div class="stat"><div class="label">Time</div><div class="value" id="s-time">—</div></div>
+      <div class="stat"><div class="label">NTP</div><div class="value" id="s-ntp">—</div></div>
+    </div>
+  </section>
+
+  <!-- WiFi Setup -->
+  <section id="wifi-section" class="draggable-section" draggable="true" style="display:none">
+    <h2>WiFi Setup</h2>
+    <div id="wifi-ap-banner" style="display:none;margin-bottom:10px;padding:8px;background:#2a1500;border:1px solid #ffa726;border-radius:3px;color:#ffa726">
+      &#9888; Running in AP mode &mdash; configure WiFi below to enable MQTT uplink
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start">
+      <div>
+        <div style="font-size:10px;color:#aaa;margin-bottom:2px;text-transform:uppercase">Primary</div>
+        <div class="form-row"><label>SSID</label><input type="text" id="wifi-ssid" placeholder="Network name"><button class="btn" onclick="scanWifi()" style="margin-top:0;margin-left:4px">Scan</button></div>
+        <div class="form-row"><label>Password</label><input type="password" id="wifi-pass" placeholder="leave empty for open"></div>
+        <div style="font-size:10px;color:#aaa;margin:4px 0 2px;text-transform:uppercase">Backup</div>
+        <div class="form-row"><label>SSID</label><input type="text" id="wifi-ssid2" placeholder="Backup network"></div>
+        <div class="form-row"><label>Password</label><input type="password" id="wifi-pass2" placeholder="leave empty for open"></div>
+        <button class="btn" onclick="saveWifi()">Save &amp; Reboot</button>
+        <div class="msg" id="wifi-msg"></div>
+      </div>
+      <div id="wifi-scan-list" style="display:none;flex:1;min-width:200px">
+        <div style="font-size:10px;color:#666;margin-bottom:4px">Click to select:</div>
+        <div id="wifi-nets" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MQTT Config -->
+  <section id="mqtt-section" class="draggable-section" draggable="true">
+    <h2>MQTT Config</h2>
+    <div class="form-row"><label>Broker</label><input type="text" id="mqtt-broker" placeholder="hostname or IP" style="width:200px"></div>
+    <div class="form-row"><label>Port</label><input type="number" id="mqtt-port" min="1" max="65535"></div>
+    <div class="form-row"><label>Topic Prefix</label><input type="text" id="mqtt-prefix" placeholder="Sensors/" style="width:140px"></div>
+    <div class="form-row"><label>TLS / MQTTS</label><input type="checkbox" id="mqtt-tls"></div>
+    <button class="btn" onclick="saveMqttConfig()">Save &amp; Reboot</button>
+    <div class="msg" id="mqtt-msg"></div>
+  </section>
+
+  <!-- Hardware Setup -->
+  <section id="hw-section" class="draggable-section" draggable="true">
+    <h2>Hardware Setup</h2>
+    <div class="form-row"><label>I2C SDA</label><input type="number" id="hw-sda" min="-1" max="48"></div>
+    <div class="form-row"><label>I2C SCL</label><input type="number" id="hw-scl" min="-1" max="48"></div>
+    <div class="form-row"><label>UART RX</label><input type="number" id="hw-urx" min="-1" max="48"></div>
+    <div class="form-row"><label>UART TX</label><input type="number" id="hw-utx" min="-1" max="48"></div>
+    <div class="form-row"><label>1-Wire pin</label><input type="number" id="hw-ow" min="-1" max="48"></div>
+    <div class="form-row"><label>LED pin</label><input type="number" id="hw-led" min="-1" max="48" title="-1 = disabled"></div>
+    <div class="form-row"><label>Interval (s)</label><input type="number" id="hw-interval" min="1" max="3600"></div>
+    <button class="btn" onclick="saveHwConfig()">Save &amp; Reboot</button>
+    <div class="msg" id="hw-msg"></div>
+  </section>
+
+  <!-- Sensor Setup -->
+  <section id="sensorsetup-section" class="draggable-section" draggable="true">
+    <h2>Sensor Setup</h2>
+    <div id="sensor-cards"></div>
+    <button class="btn" onclick="saveSensorSetup()">Save</button>
+    <div class="msg" id="sensorsetup-msg"></div>
+  </section>
+
+  <!-- Sensor Labels -->
+  <section id="sensorlabel-section" class="draggable-section" draggable="true">
+    <h2>Sensor Labels</h2>
+    <textarea id="sensor-json" spellcheck="false" placeholder="Loading..."></textarea>
+    <div class="btn-row">
+      <button class="btn" onclick="saveSensorLabels()">Save</button>
+      <button class="btn" onclick="loadSensorLabels()">Reload</button>
+    </div>
+    <div class="msg" id="sensorlabel-msg"></div>
+  </section>
+
+  <!-- Commands -->
+  <section id="cmd-section" class="draggable-section" draggable="true">
+    <h2>Commands</h2>
+    <div class="btn-row">
+      <button class="btn danger" onclick="sendCmd({cmd:'reboot'})">Reboot</button>
+      <button class="btn" onclick="sendCmd({cmd:'telemetry'})">Send Telemetry</button>
+      <button class="btn" id="debug-btn" onclick="toggleDebug()">Debug Log: OFF</button>
+    </div>
+    <div class="msg" id="cmd-msg"></div>
+  </section>
+
+  <!-- Firmware Update -->
+  <section id="ota-section" class="full draggable-section" draggable="true">
+    <h2>Firmware Update</h2>
+    <div style="display:flex;align-items:center;gap:8px">
+      <input type="file" id="ota-file" accept=".bin" style="font-size:12px;font-family:monospace;color:#ccc;background:none;border:none;padding:0;flex:1;min-width:0">
+      <button class="btn" onclick="doOta()" style="margin-top:0;flex-shrink:0">Flash &amp; Reboot</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <span style="flex:1;font-size:12px;color:#888">Download from OTA server — watch log for progress</span>
+      <button class="btn" onclick="postJson('/api/cmd',{cmd:'otaCheck'},'ota-msg')" style="margin-top:0;flex-shrink:0">Check OTA Server</button>
+    </div>
+    <progress id="ota-progress" value="0" max="100" style="width:100%;height:6px;display:none;margin-top:6px"></progress>
+    <div class="msg" id="ota-msg"></div>
+  </section>
+
+  <!-- Log Stream -->
+  <section id="log-section" class="full">
+    <h2>Log Stream</h2>
+    <div class="ws-status"><span id="ws-dot">&#9679;</span> <span id="ws-label">disconnected</span></div>
+    <div id="log"></div>
+  </section>
+
+</main>
+<script>
+var MAX_LOG = 200;
+
+// ── State ──────────────────────────────────────────────────────────────────────
+function loadState() {
+  fetch('/api/state')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      set('s-chip',   d.chipId);
+      set('s-wifi',   d.apMode ? '<span class="warn">&#9679; AP mode</span>'
+                               : (d.wifiConnected ? '<span class="ok">&#9679; connected</span>'
+                                                  : '<span class="err">&#9679; offline</span>'));
+      set('s-mqtt',   d.mqttConnected ? '<span class="ok">&#9679; connected</span>' : '<span class="err">&#9679; offline</span>');
+      set('s-rssi',   d.apMode ? '—' : (d.wifiRSSI + ' dBm'));
+      set('s-uptime', d.uptime + ' min');
+      set('s-sensors', d.sensorsActive);
+      set('s-readings', d.readingCount);
+      set('s-heap',   Math.round(d.freeHeap/1024) + ' KB');
+      set('s-sample', d.sampleNum);
+      set('s-tele',   d.teleInterval + ' min');
+      set('s-build',  d.build);
+      document.getElementById('devname').textContent = d.sysname || '';
+      if (d.ntpSynced && d.epochTime) {
+        var dt = new Date(d.epochTime*1000);
+        set('s-time', pad(dt.getHours())+':'+pad(dt.getMinutes())+':'+pad(dt.getSeconds()));
+        set('s-ntp',  '<span class="ok">synced</span>');
+      } else {
+        set('s-time', '—');
+        set('s-ntp',  '<span class="err">not synced</span>');
+      }
+    })
+    .catch(function(){set('s-wifi','<span class="err">fetch failed</span>')});
+}
+
+function set(id, html) {
+  var el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+// ── WiFi ──────────────────────────────────────────────────────────────────────
+function loadWifi() {
+  fetch('/api/wifi').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('wifi-section').style.display = 'block';
+    document.getElementById('wifi-ap-banner').style.display = d.apMode ? 'block' : 'none';
+    if (d.ssid)  document.getElementById('wifi-ssid').value  = d.ssid;
+    if (d.ssid2) document.getElementById('wifi-ssid2').value = d.ssid2;
+  }).catch(function(){});
+}
+
+function scanWifi() {
+  showMsg('wifi-msg','Scanning...',true);
+  document.getElementById('wifi-scan-list').style.display = 'none';
+  fetch('/api/wifi/scan').then(function(r){return r.json()}).then(function(nets){
+    var c = document.getElementById('wifi-nets');
+    c.innerHTML = '';
+    nets.sort(function(a,b){return b.rssi-a.rssi}).forEach(function(n){
+      var b = document.createElement('button');
+      b.className = 'btn'; b.style.margin = '0';
+      b.textContent = n.ssid+' ('+n.rssi+' dBm'+(n.secure?' \uD83D\uDD12':'')+')';
+      b.onclick = function(){ document.getElementById('wifi-ssid').value=n.ssid; document.getElementById('wifi-pass').focus(); };
+      c.appendChild(b);
+    });
+    document.getElementById('wifi-scan-list').style.display = nets.length ? 'block' : 'none';
+    showMsg('wifi-msg', nets.length+' networks found', true);
+  }).catch(function(){showMsg('wifi-msg','Scan failed',false)});
+}
+
+function saveWifi() {
+  var ssid = document.getElementById('wifi-ssid').value.trim();
+  if (!ssid) { showMsg('wifi-msg','SSID required',false); return; }
+  fetch('/api/wifi', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ssid:ssid, pass:document.getElementById('wifi-pass').value,
+      ssid2:document.getElementById('wifi-ssid2').value.trim(),
+      pass2:document.getElementById('wifi-pass2').value})
+  }).then(function(r){return r.json()}).then(function(d){showMsg('wifi-msg',d.ok?(d.msg||'OK'):('Error: '+d.error),d.ok)})
+    .catch(function(){showMsg('wifi-msg','Request failed',false)});
+}
+
+// ── MQTT Config ────────────────────────────────────────────────────────────────
+function loadMqttConfig() {
+  fetch('/api/mqtt/config').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('mqtt-broker').value = d.broker || '';
+    document.getElementById('mqtt-port').value   = d.port   || 8883;
+    document.getElementById('mqtt-prefix').value = d.prefix || 'Sensors/';
+    document.getElementById('mqtt-tls').checked  = !!d.tls;
+  }).catch(function(){});
+}
+
+function saveMqttConfig() {
+  var body = {
+    broker: document.getElementById('mqtt-broker').value.trim(),
+    port:   parseInt(document.getElementById('mqtt-port').value),
+    prefix: document.getElementById('mqtt-prefix').value,
+    tls:    document.getElementById('mqtt-tls').checked
+  };
+  if (!body.broker) { showMsg('mqtt-msg','Broker required',false); return; }
+  fetch('/api/mqtt/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+    .then(function(r){return r.json()})
+    .then(function(d){ showMsg('mqtt-msg', d.ok ? (d.msg||'Saved — rebooting') : ('Error: '+d.error), d.ok); })
+    .catch(function(){showMsg('mqtt-msg','Request failed',false)});
+}
+
+// ── Hardware Setup ─────────────────────────────────────────────────────────────
+function loadHwConfig() {
+  fetch('/api/hw/config').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('hw-sda').value      = d.i2c_sda  !== undefined ? d.i2c_sda  : 4;
+    document.getElementById('hw-scl').value      = d.i2c_scl  !== undefined ? d.i2c_scl  : 5;
+    document.getElementById('hw-urx').value      = d.uart_rx  !== undefined ? d.uart_rx  : 13;
+    document.getElementById('hw-utx').value      = d.uart_tx  !== undefined ? d.uart_tx  : 15;
+    document.getElementById('hw-ow').value       = d.onewire  !== undefined ? d.onewire  : 2;
+    document.getElementById('hw-led').value      = d.led_pin  !== undefined ? d.led_pin  : -1;
+    document.getElementById('hw-interval').value = d.interval !== undefined ? d.interval : 60;
+  }).catch(function(){});
+}
+
+function saveHwConfig() {
+  var body = {
+    i2c_sda:  parseInt(document.getElementById('hw-sda').value),
+    i2c_scl:  parseInt(document.getElementById('hw-scl').value),
+    uart_rx:  parseInt(document.getElementById('hw-urx').value),
+    uart_tx:  parseInt(document.getElementById('hw-utx').value),
+    onewire:  parseInt(document.getElementById('hw-ow').value),
+    led_pin:  parseInt(document.getElementById('hw-led').value),
+    interval: parseInt(document.getElementById('hw-interval').value)
+  };
+  fetch('/api/hw/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+    .then(function(r){return r.json()})
+    .then(function(d){ showMsg('hw-msg', d.ok ? (d.msg||'Saved — rebooting') : ('Error: '+d.error), d.ok); })
+    .catch(function(){showMsg('hw-msg','Request failed',false)});
+}
+
+// ── Sensor Setup ───────────────────────────────────────────────────────────────
+var SENSOR_TYPES = [
+  {type:'bme280',  label:'BME280',      fields:[{key:'addr',label:'I2C addr',def:0x76}]},
+  {type:'sht30',   label:'SHT30/SHT31', fields:[{key:'addr',label:'I2C addr',def:0x44}]},
+  {type:'ds18b20', label:'DS18B20',     fields:[]},
+];
+
+var sensorSetupData = [];
+
+function renderSensorCards(data) {
+  var container = document.getElementById('sensor-cards');
+  container.innerHTML = '';
+  SENSOR_TYPES.forEach(function(st) {
+    var entry = data.find(function(e){return e.type===st.type}) || {type:st.type,enabled:false};
+    var card = document.createElement('div');
+    card.className = 'sensor-card';
+    var headHtml = '<div class="sc-head">'
+      +'<input type="checkbox" data-type="'+st.type+'" '+(entry.enabled?'checked':'')+'>'
+      +'<span class="sc-type">'+st.label+'</span></div>';
+    var fieldsHtml = '<div class="sc-fields">';
+    st.fields.forEach(function(f){
+      var val = entry[f.key] !== undefined ? entry[f.key] : f.def;
+      fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
+        +'<input type="number" data-type="'+st.type+'" data-key="'+f.key+'" value="'+val+'"></div>';
+    });
+    fieldsHtml += '</div>';
+    card.innerHTML = headHtml + fieldsHtml;
+    container.appendChild(card);
+  });
+}
+
+function loadSensorSetup() {
+  fetch('/api/sensors/setup').then(function(r){return r.json()}).then(function(d){
+    sensorSetupData = Array.isArray(d) ? d : [];
+    renderSensorCards(sensorSetupData);
+  }).catch(function(){renderSensorCards([])});
+}
+
+function saveSensorSetup() {
+  var result = [];
+  SENSOR_TYPES.forEach(function(st) {
+    var cb  = document.querySelector('input[type=checkbox][data-type="'+st.type+'"]');
+    var obj = {type: st.type, enabled: cb ? cb.checked : false};
+    st.fields.forEach(function(f){
+      var inp = document.querySelector('input[data-type="'+st.type+'"][data-key="'+f.key+'"]');
+      if (inp) obj[f.key] = parseInt(inp.value);
+    });
+    result.push(obj);
+  });
+  fetch('/api/sensors/setup', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(result)})
+    .then(function(r){return r.json()})
+    .then(function(d){showMsg('sensorsetup-msg', d.ok ? 'Saved.' : ('Error: '+d.error), d.ok)})
+    .catch(function(){showMsg('sensorsetup-msg','Request failed',false)});
+}
+
+// ── Sensor Labels ──────────────────────────────────────────────────────────────
+function loadSensorLabels() {
+  fetch('/api/sensors').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('sensor-json').value = JSON.stringify(d,null,2);
+  }).catch(function(){document.getElementById('sensorlabel-msg').textContent='Fetch failed'});
+}
+
+function saveSensorLabels() {
+  var raw = document.getElementById('sensor-json').value;
+  try { JSON.parse(raw); } catch(e) {
+    document.getElementById('sensorlabel-msg').textContent = 'Invalid JSON: '+e.message; return;
+  }
+  fetch('/api/sensors',{method:'POST',headers:{'Content-Type':'application/json'},body:raw})
+    .then(function(r){return r.json()})
+    .then(function(d){showMsg('sensorlabel-msg', d.ok?'Saved.':('Error: '+d.error), d.ok)})
+    .catch(function(){showMsg('sensorlabel-msg','Request failed',false)});
+}
+
+// ── Commands ───────────────────────────────────────────────────────────────────
+function sendCmd(body) { postJson('/api/cmd', body, 'cmd-msg'); }
+
+var debugOn = false;
+function toggleDebug() {
+  debugOn = !debugOn;
+  postJson('/api/cmd', {debugLog: debugOn}, 'cmd-msg');
+  var btn = document.getElementById('debug-btn');
+  btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');
+  btn.style.color = debugOn ? '#4caf50' : '';
+  btn.style.borderColor = debugOn ? '#4caf50' : '';
+}
+
+// ── OTA ────────────────────────────────────────────────────────────────────────
+function doOta() {
+  var file = document.getElementById('ota-file').files[0];
+  if (!file) { showMsg('ota-msg','Select a .bin file first',false); return; }
+  var prog = document.getElementById('ota-progress');
+  prog.value = 0; prog.style.display = 'block';
+  var fd = new FormData();
+  fd.append('firmware', file, file.name);
+  var xhr = new XMLHttpRequest();
+  xhr.upload.onprogress = function(e){ if(e.lengthComputable) prog.value=Math.round(e.loaded/e.total*100); };
+  xhr.onload = function(){
+    prog.value=100;
+    try { var d=JSON.parse(xhr.responseText); showMsg('ota-msg',d.ok?'Flashed — rebooting':('Error: '+d.error),d.ok); }
+    catch(e){ showMsg('ota-msg','Done',true); }
+    prog.style.display = 'none';
+  };
+  xhr.onerror = function(){ showMsg('ota-msg','Upload failed',false); prog.style.display='none'; };
+  xhr.open('POST','/api/ota');
+  xhr.send(fd);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function postJson(url, body, msgId) {
+  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json()})
+    .then(function(d){showMsg(msgId, d.ok?'OK':('Error: '+d.error), d.ok)})
+    .catch(function(){showMsg(msgId,'Request failed',false)});
+}
+
+function showMsg(id, text, ok) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = '<span class="'+(ok?'ok':'err')+'">'+text+'</span>';
+  setTimeout(function(){el.textContent='';},3000);
+}
+
+function pad(n){ return n<10?'0'+n:''+n; }
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── WebSocket log ──────────────────────────────────────────────────────────────
+function connectWs() {
+  var wsUrl = 'ws://'+location.hostname+':81';
+  var ws = new WebSocket(wsUrl);
+  var dot = document.getElementById('ws-dot');
+  var lbl = document.getElementById('ws-label');
+  ws.onopen  = function(){ dot.className='ws-ok'; lbl.textContent='connected to '+wsUrl; };
+  ws.onclose = function(){ dot.className='ws-err'; lbl.textContent='disconnected — retrying in 3s'; setTimeout(connectWs,3000); };
+  ws.onerror = function(){ ws.close(); };
+  ws.onmessage = function(evt){
+    var d; try{d=JSON.parse(evt.data);}catch(e){return;}
+    var log = document.getElementById('log');
+    var row = document.createElement('div');
+    row.className = 'log-entry log-'+(d.l||'info');
+    var ts = Math.floor((d.t||0)/1000);
+    var h=Math.floor(ts/3600), m=Math.floor((ts%3600)/60), s=ts%60;
+    row.innerHTML = '<span class="log-ts">'+pad(h)+':'+pad(m)+':'+pad(s)+'</span>'
+                  + '<span class="warn">['+d.l+']</span> '+escHtml(d.m||'');
+    log.appendChild(row);
+    while(log.children.length>MAX_LOG) log.removeChild(log.firstChild);
+    log.scrollTop = log.scrollHeight;
+  };
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+loadState();
+loadWifi();
+loadMqttConfig();
+loadHwConfig();
+loadSensorSetup();
+loadSensorLabels();
+connectWs();
+setInterval(loadState, 15000);
+
+// ── Drag & drop ────────────────────────────────────────────────────────────────
+(function(){
+  var src=null, fromHandle=false;
+  document.addEventListener('mouseup',function(){fromHandle=false;});
+  function ds(e){if(!fromHandle){e.preventDefault();return;}src=this;setTimeout(function(){if(src)src.classList.add('dragging');},0);}
+  function de(){fromHandle=false;this.classList.remove('dragging');document.querySelectorAll('.drag-over').forEach(function(x){x.classList.remove('drag-over');});var o=[];document.querySelectorAll('main .draggable-section').forEach(function(x){if(x.id)o.push(x.id);});localStorage.setItem('sOrder',JSON.stringify(o));}
+  function dv(e){e.preventDefault();}
+  function den(e){if(this!==src)this.classList.add('drag-over');}
+  function dl(e){if(!this.contains(e.relatedTarget))this.classList.remove('drag-over');}
+  function dp(e){e.preventDefault();this.classList.remove('drag-over');if(!src||this===src)return;var r=this.getBoundingClientRect();this.parentNode.insertBefore(src,e.clientY<r.top+r.height/2?this:this.nextSibling);}
+  document.querySelectorAll('.draggable-section').forEach(function(el){
+    var h2=el.querySelector('h2');
+    if(h2) h2.addEventListener('mousedown',function(){fromHandle=true;});
+    el.addEventListener('dragstart',ds);el.addEventListener('dragend',de);
+    el.addEventListener('dragover',dv);el.addEventListener('dragenter',den);
+    el.addEventListener('dragleave',dl);el.addEventListener('drop',dp);
+  });
+  var stored=localStorage.getItem('sOrder');
+  if(stored){var anchor=document.getElementById('log-section');try{JSON.parse(stored).forEach(function(id){var el=document.getElementById(id);if(el)anchor.parentNode.insertBefore(el,anchor);});}catch(e){}}
+})();
+
+// ── Section resize ─────────────────────────────────────────────────────────────
+(function(){
+  function getSpan(el){return parseInt(el.getAttribute('data-span')||(el.classList.contains('full')?'3':'1'));}
+  function setSpan(el,n){n=Math.max(1,Math.min(3,n));el.setAttribute('data-span',n);el.style.gridColumn=n>1?'span '+n:'';if(n===3)el.classList.add('full');else el.classList.remove('full');}
+  function saveSpans(){var s={};document.querySelectorAll('.draggable-section').forEach(function(x){if(x.id)s[x.id]=getSpan(x);});localStorage.setItem('sSpans',JSON.stringify(s));}
+  document.querySelectorAll('.draggable-section').forEach(function(el){
+    setSpan(el,getSpan(el));
+    var g=document.createElement('div');g.className='sec-grip';g.textContent='⣿';el.appendChild(g);
+    g.addEventListener('mousedown',function(e){
+      e.stopPropagation();e.preventDefault();
+      var main=document.querySelector('main');
+      var cw=parseFloat(getComputedStyle(main).gridTemplateColumns.split(' ')[0]);
+      var sx=e.clientX,ss=getSpan(el);
+      function mv(e){setSpan(el,ss+Math.round((e.clientX-sx)/(cw+12)));}
+      function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);saveSpans();}
+      document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
+    });
+  });
+  var s=localStorage.getItem('sSpans');
+  if(s){try{var sp=JSON.parse(s);Object.keys(sp).forEach(function(id){var el=document.getElementById(id);if(el)setSpan(el,sp[id]);});}catch(e){}}
+})();
+</script>
+</body>
+</html>
