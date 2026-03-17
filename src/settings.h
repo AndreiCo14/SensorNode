@@ -13,7 +13,7 @@
 #  define DEFAULT_MQTT_BROKER   "mq.airmq.cc"
 #endif
 #ifndef DEFAULT_MQTT_PORT
-#  define DEFAULT_MQTT_PORT     8883
+#  define DEFAULT_MQTT_PORT     18883
 #endif
 #ifndef DEFAULT_MQTT_PREFIX
 #  define DEFAULT_MQTT_PREFIX   "Sensors/"
@@ -23,8 +23,8 @@
 #endif
 
 // MQTT topic suffixes
-#define TOPIC_DATA_SUFFIX   "/sensordat"
-#define TOPIC_TELE_SUFFIX   "/telemet"
+#define TOPIC_DATA_SUFFIX   "/sensordata"
+#define TOPIC_TELE_SUFFIX   "/telemetry"
 #define TOPIC_START_SUFFIX  "/Start"
 #define TOPIC_CMD_SUFFIX    "/cmd"
 #define TOPIC_STATUS_SUFFIX "/Status"
