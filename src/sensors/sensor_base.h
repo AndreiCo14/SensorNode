@@ -24,6 +24,10 @@ public:
     // r.deviceId, r.time, r.count, r.mV, r.immTX should be set by caller.
     virtual bool read(SensorReading& r) = 0;
 
+    // Periodic tick — called every loop iteration; default is no-op.
+    // Returns true to request an immediate combined sensor read (e.g. PMS7003 ready).
+    virtual bool tick() { return false; }
+
     // Short type identifier string: "bme280", "sht30", "ds18b20", ...
     virtual const char* type() const = 0;
 

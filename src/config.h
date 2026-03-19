@@ -22,7 +22,6 @@
 #define MQTT_CONF_PATH      "/mqtt.json"
 #define HW_CONF_PATH        "/hwconfig.json"
 #define SENSOR_SETUP_PATH   "/sensorsetup.json"
-#define SENSORCONF_PATH     "/sensorconf.json"
 
 // ─── Time ─────────────────────────────────────────────────────────────────────
 #define MYTZ    "CET-1CEST,M3.5.0,M10.5.0/3"

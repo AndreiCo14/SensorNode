@@ -6,16 +6,13 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 
-JsonDocument sensorConfData;
 JsonDocument sensorSetupData;
-SemaphoreHandle_t sensorConfMutex  = NULL;
 SemaphoreHandle_t sensorSetupMutex = NULL;
 bool lfsReady = false;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 bool storageInit() {
-    sensorConfMutex  = xSemaphoreCreateMutex();
     sensorSetupMutex = xSemaphoreCreateMutex();
 
 #ifdef ESP8266
@@ -121,36 +118,48 @@ bool saveMqttConfig(const MqttConfig& cfg) {
 
 bool loadHwConfig(HwConfig& cfg) {
     // Apply board defaults first
-    cfg.i2c_sda     = DEFAULT_I2C_SDA;
-    cfg.i2c_scl     = DEFAULT_I2C_SCL;
-    cfg.uart_rx     = DEFAULT_UART_RX;
-    cfg.uart_tx     = DEFAULT_UART_TX;
-    cfg.onewire     = DEFAULT_ONEWIRE;
-    cfg.led_pin     = DEFAULT_LED_PIN;
-    cfg.intervalSec = 60;
+    cfg.i2c_sda      = DEFAULT_I2C_SDA;
+    cfg.i2c_scl      = DEFAULT_I2C_SCL;
+    cfg.uart_rx      = DEFAULT_UART_RX;
+    cfg.uart_tx      = DEFAULT_UART_TX;
+    cfg.onewire      = DEFAULT_ONEWIRE;
+    cfg.led_pin      = DEFAULT_LED_PIN;
+    cfg.intervalSec  = 60;
+    cfg.teleIntervalM = DEFAULT_TELE_INTERVAL_M;
+    cfg.sampleNum    = DEFAULT_SAMPLE_NUM;
+    cfg.onTime       = 30;
 
     JsonDocument doc;
     if (!readJson(HW_CONF_PATH, doc)) return false;
 
-    if (!doc["i2c_sda"].isNull())   cfg.i2c_sda     = doc["i2c_sda"].as<int8_t>();
-    if (!doc["i2c_scl"].isNull())   cfg.i2c_scl     = doc["i2c_scl"].as<int8_t>();
-    if (!doc["uart_rx"].isNull())   cfg.uart_rx     = doc["uart_rx"].as<int8_t>();
-    if (!doc["uart_tx"].isNull())   cfg.uart_tx     = doc["uart_tx"].as<int8_t>();
-    if (!doc["onewire"].isNull())   cfg.onewire     = doc["onewire"].as<int8_t>();
-    if (!doc["led_pin"].isNull())   cfg.led_pin     = doc["led_pin"].as<int8_t>();
-    if (!doc["interval"].isNull())  cfg.intervalSec = doc["interval"].as<uint16_t>();
+    if (!doc["i2c_sda"].isNull())       cfg.i2c_sda      = doc["i2c_sda"].as<int8_t>();
+    if (!doc["i2c_scl"].isNull())       cfg.i2c_scl      = doc["i2c_scl"].as<int8_t>();
+    if (!doc["uart_rx"].isNull())       cfg.uart_rx      = doc["uart_rx"].as<int8_t>();
+    if (!doc["uart_tx"].isNull())       cfg.uart_tx      = doc["uart_tx"].as<int8_t>();
+    if (!doc["onewire"].isNull())       cfg.onewire      = doc["onewire"].as<int8_t>();
+    if (!doc["led_pin"].isNull())       cfg.led_pin      = doc["led_pin"].as<int8_t>();
+    if (!doc["interval"].isNull())      cfg.intervalSec  = doc["interval"].as<uint16_t>();
+    if (!doc["teleIntervalM"].isNull()) cfg.teleIntervalM = doc["teleIntervalM"].as<uint16_t>();
+    if (!doc["sampleNum"].isNull())     cfg.sampleNum    = doc["sampleNum"].as<int8_t>();
+    if (!doc["onTime"].isNull()) {
+        cfg.onTime = doc["onTime"].as<uint16_t>();
+        if (cfg.onTime < 30) cfg.onTime = 30;
+    }
     return true;
 }
 
 bool saveHwConfig(const HwConfig& cfg) {
     JsonDocument doc;
-    doc["i2c_sda"]  = cfg.i2c_sda;
-    doc["i2c_scl"]  = cfg.i2c_scl;
-    doc["uart_rx"]  = cfg.uart_rx;
-    doc["uart_tx"]  = cfg.uart_tx;
-    doc["onewire"]  = cfg.onewire;
-    doc["led_pin"]  = cfg.led_pin;
-    doc["interval"] = cfg.intervalSec;
+    doc["i2c_sda"]       = cfg.i2c_sda;
+    doc["i2c_scl"]       = cfg.i2c_scl;
+    doc["uart_rx"]       = cfg.uart_rx;
+    doc["uart_tx"]       = cfg.uart_tx;
+    doc["onewire"]       = cfg.onewire;
+    doc["led_pin"]       = cfg.led_pin;
+    doc["interval"]      = cfg.intervalSec;
+    doc["teleIntervalM"] = cfg.teleIntervalM;
+    doc["sampleNum"]     = cfg.sampleNum;
+    doc["onTime"]        = cfg.onTime;
     return writeJson(HW_CONF_PATH, doc);
 }
 
@@ -187,32 +196,3 @@ bool saveSensorSetup() {
     return ok;
 }
 
-// ─── Sensor label config ──────────────────────────────────────────────────────
-
-bool loadSensorConf() {
-    if (!LittleFS.exists(SENSORCONF_PATH)) return false;
-    File f = LittleFS.open(SENSORCONF_PATH, "r");
-    if (!f || f.size() == 0) { f.close(); return false; }
-    bool ok = false;
-    if (xSemaphoreTake(sensorConfMutex, pdMS_TO_TICKS(1000))) {
-        DeserializationError err = deserializeJson(sensorConfData, f);
-        xSemaphoreGive(sensorConfMutex);
-        ok = !err;
-    }
-    f.close();
-    if (ok) logMessage("sensorconf loaded", "info");
-    return ok;
-}
-
-bool saveSensorConf() {
-    File f = LittleFS.open(SENSORCONF_PATH, "w");
-    if (!f) return false;
-    bool ok = false;
-    if (xSemaphoreTake(sensorConfMutex, pdMS_TO_TICKS(1000))) {
-        ok = (serializeJson(sensorConfData, f) > 0);
-        xSemaphoreGive(sensorConfMutex);
-    }
-    f.close();
-    logMessage(ok ? "sensorconf saved" : "sensorconf write failed", ok ? "info" : "error");
-    return ok;
-}

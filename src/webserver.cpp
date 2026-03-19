@@ -167,13 +167,16 @@ static void handleGetHwConfig() {
     HwConfig cfg;
     loadHwConfig(cfg);
     JsonDocument doc;
-    doc["i2c_sda"]  = cfg.i2c_sda;
-    doc["i2c_scl"]  = cfg.i2c_scl;
-    doc["uart_rx"]  = cfg.uart_rx;
-    doc["uart_tx"]  = cfg.uart_tx;
-    doc["onewire"]  = cfg.onewire;
-    doc["led_pin"]  = cfg.led_pin;
-    doc["interval"] = cfg.intervalSec;
+    doc["i2c_sda"]       = cfg.i2c_sda;
+    doc["i2c_scl"]       = cfg.i2c_scl;
+    doc["uart_rx"]       = cfg.uart_rx;
+    doc["uart_tx"]       = cfg.uart_tx;
+    doc["onewire"]       = cfg.onewire;
+    doc["led_pin"]       = cfg.led_pin;
+    doc["interval"]      = cfg.intervalSec;
+    doc["teleIntervalM"] = cfg.teleIntervalM;
+    doc["sampleNum"]     = cfg.sampleNum;
+    doc["onTime"]        = cfg.onTime;
     sendJsonDoc(200, doc);
 }
 
@@ -187,13 +190,16 @@ static void handlePostHwConfig() {
     }
     HwConfig cfg;
     loadHwConfig(cfg);  // start from current defaults
-    if (!doc["i2c_sda"].isNull())  cfg.i2c_sda     = doc["i2c_sda"].as<int8_t>();
-    if (!doc["i2c_scl"].isNull())  cfg.i2c_scl     = doc["i2c_scl"].as<int8_t>();
-    if (!doc["uart_rx"].isNull())  cfg.uart_rx     = doc["uart_rx"].as<int8_t>();
-    if (!doc["uart_tx"].isNull())  cfg.uart_tx     = doc["uart_tx"].as<int8_t>();
-    if (!doc["onewire"].isNull())  cfg.onewire     = doc["onewire"].as<int8_t>();
-    if (!doc["led_pin"].isNull())  cfg.led_pin     = doc["led_pin"].as<int8_t>();
-    if (!doc["interval"].isNull()) cfg.intervalSec = doc["interval"].as<uint16_t>();
+    if (!doc["i2c_sda"].isNull())       cfg.i2c_sda       = doc["i2c_sda"].as<int8_t>();
+    if (!doc["i2c_scl"].isNull())       cfg.i2c_scl       = doc["i2c_scl"].as<int8_t>();
+    if (!doc["uart_rx"].isNull())       cfg.uart_rx       = doc["uart_rx"].as<int8_t>();
+    if (!doc["uart_tx"].isNull())       cfg.uart_tx       = doc["uart_tx"].as<int8_t>();
+    if (!doc["onewire"].isNull())       cfg.onewire       = doc["onewire"].as<int8_t>();
+    if (!doc["led_pin"].isNull())       cfg.led_pin       = doc["led_pin"].as<int8_t>();
+    if (!doc["interval"].isNull())      cfg.intervalSec   = doc["interval"].as<uint16_t>();
+    if (!doc["teleIntervalM"].isNull()) cfg.teleIntervalM = doc["teleIntervalM"].as<uint16_t>();
+    if (!doc["sampleNum"].isNull())     cfg.sampleNum     = doc["sampleNum"].as<int8_t>();
+    if (!doc["onTime"].isNull())        cfg.onTime        = doc["onTime"].as<uint16_t>();
     saveHwConfig(cfg);
     logMessage("HW config saved", "info");
     sendJson(200, "{\"ok\":true,\"msg\":\"Saved. Rebooting...\"}");
@@ -213,6 +219,42 @@ static void handleGetSensorSetup() {
     }
 }
 
+// ─── GET /api/config/export ───────────────────────────────────────────────────
+
+static void handleGetConfigExport() {
+    JsonDocument doc;
+
+    MqttConfig mqtt;
+    loadMqttConfig(mqtt);
+    doc["mqtt"]["broker"] = mqtt.broker;
+    doc["mqtt"]["port"]   = mqtt.port;
+    doc["mqtt"]["prefix"] = mqtt.prefix;
+    doc["mqtt"]["tls"]    = mqtt.tls;
+
+    HwConfig hw;
+    loadHwConfig(hw);
+    doc["hw"]["i2c_sda"]       = hw.i2c_sda;
+    doc["hw"]["i2c_scl"]       = hw.i2c_scl;
+    doc["hw"]["uart_rx"]       = hw.uart_rx;
+    doc["hw"]["uart_tx"]       = hw.uart_tx;
+    doc["hw"]["onewire"]       = hw.onewire;
+    doc["hw"]["led_pin"]       = hw.led_pin;
+    doc["hw"]["interval"]      = hw.intervalSec;
+    doc["hw"]["teleIntervalM"] = hw.teleIntervalM;
+    doc["hw"]["sampleNum"]     = hw.sampleNum;
+    doc["hw"]["onTime"]        = hw.onTime;
+
+    if (xSemaphoreTake(sensorSetupMutex, pdMS_TO_TICKS(500))) {
+        doc["sensorSetup"] = sensorSetupData;
+        xSemaphoreGive(sensorSetupMutex);
+    }
+
+    String out;
+    serializeJsonPretty(doc, out);
+    httpServer.sendHeader("Content-Disposition", "attachment; filename=\"sensornode-config.json\"");
+    httpServer.send(200, "application/json", out);
+}
+
 // ─── POST /api/sensors/setup ──────────────────────────────────────────────────
 
 static void handlePostSensorSetup() {
@@ -224,32 +266,6 @@ static void handlePostSensorSetup() {
         saveSensorSetup();
         sendJson(200, "{\"ok\":true}");
         logMessage("Sensor setup updated via web", "info");
-    } else {
-        sendJson(503, "{\"error\":\"busy\"}");
-    }
-}
-
-// ─── GET /api/sensors (label mapping) ────────────────────────────────────────
-
-static void handleGetSensors() {
-    if (xSemaphoreTake(sensorConfMutex, pdMS_TO_TICKS(500))) {
-        String out;
-        serializeJson(sensorConfData, out);
-        xSemaphoreGive(sensorConfMutex);
-        sendJson(200, out);
-    } else {
-        sendJson(503, "{\"error\":\"busy\"}");
-    }
-}
-
-static void handlePostSensors() {
-    if (!httpServer.hasArg("plain")) { sendJson(400, "{\"error\":\"no body\"}"); return; }
-    if (xSemaphoreTake(sensorConfMutex, pdMS_TO_TICKS(1000))) {
-        DeserializationError err = deserializeJson(sensorConfData, httpServer.arg("plain"));
-        xSemaphoreGive(sensorConfMutex);
-        if (err) { sendJson(400, "{\"error\":\"invalid JSON\"}"); return; }
-        saveSensorConf();
-        sendJson(200, "{\"ok\":true}");
     } else {
         sendJson(503, "{\"error\":\"busy\"}");
     }
@@ -291,7 +307,8 @@ static void handleOtaResponse() {
         sendJson(500, String("{\"ok\":false,\"error\":\"") + OTA_ERROR_STRING() + "\"}");
     else {
         sendJson(200, "{\"ok\":true,\"msg\":\"Rebooting...\"}");
-        vTaskDelay(pdMS_TO_TICKS(200));
+        logMessage("OTA done — rebooting", "info");
+        vTaskDelay(pdMS_TO_TICKS(500));
         DEVICE_RESTART();
     }
 }
@@ -378,10 +395,7 @@ static void webServerSetup() {
     // Sensor setup
     httpServer.on("/api/sensors/setup", HTTP_GET,  handleGetSensorSetup);
     httpServer.on("/api/sensors/setup", HTTP_POST, handlePostSensorSetup);
-
-    // Sensor labels
-    httpServer.on("/api/sensors",    HTTP_GET,  handleGetSensors);
-    httpServer.on("/api/sensors",    HTTP_POST, handlePostSensors);
+    httpServer.on("/api/config/export", HTTP_GET,  handleGetConfigExport);
 
     // Other
     httpServer.on("/api/state",      HTTP_GET,  handleGetState);
@@ -409,6 +423,7 @@ void webTask(void* pvParameters) {
     for (;;) {
         httpServer.handleClient();
         if (rebootPending) {
+            logMessage("Rebooting...", "info");
             vTaskDelay(pdMS_TO_TICKS(500));
             DEVICE_RESTART();
         }
@@ -424,6 +439,7 @@ void webInit() {
 void webProcess() {
     httpServer.handleClient();
     if (rebootPending) {
+        logMessage("Rebooting...", "info");
         delay(500);
         DEVICE_RESTART();
     }

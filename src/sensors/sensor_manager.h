@@ -11,6 +11,9 @@ void sensorTask(void* pvParameters);
 // Called from main after storage init to build the sensor list
 void sensorsInit();
 
+// Enable measurement cycles; call after MQTT startup handshake completes
+void sensorsEnable();
+
 // Number of sensors that successfully initialized
 uint8_t sensorsActiveCount();
 

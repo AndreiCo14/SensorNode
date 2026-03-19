@@ -39,6 +39,6 @@ bool Ds18b20Sensor::read(SensorReading& r) {
     }
 
     r.msgType = msgType();
-    snprintf(r.data, sizeof(r.data), "{\"temp\":%.2f}", temp);
+    snprintf(r.data, sizeof(r.data), "{\"Temp\":%.2f}", temp);
     return true;
 }

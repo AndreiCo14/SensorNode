@@ -61,6 +61,8 @@ static inline BaseType_t xQueueReceive(QueueHandle_t q, void* item, TickType_t) 
     return pdTRUE;
 }
 
+static inline UBaseType_t uxQueueMessagesWaiting(QueueHandle_t q) { return q ? (UBaseType_t)q->cnt : 0; }
+
 // ── Tasks (registration stub; actual execution via loop()) ───────────────────
 typedef void* TaskHandle_t;
 

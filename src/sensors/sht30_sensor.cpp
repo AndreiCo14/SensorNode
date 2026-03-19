@@ -32,7 +32,7 @@ bool Sht30Sensor::read(SensorReading& r) {
 
     r.msgType = msgType();
     snprintf(r.data, sizeof(r.data),
-             "{\"temp\":%.2f,\"hum\":%.1f}",
+             "{\"Temp\":%.2f,\"Hum\":%.1f}",
              temp, hum);
     return true;
 }

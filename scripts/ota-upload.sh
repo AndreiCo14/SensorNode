@@ -22,8 +22,8 @@ fi
 OTA_SSH_USER="${OTA_SSH_USER:-antonr}"
 OTA_SSH_ADDR="${OTA_SSH_ADDR:-192.168.110.112}"
 OTA_SSH_PORT="${OTA_SSH_PORT:-2222}"
-OTA_SERVER_PATH="${OTA_SERVER_PATH:-/volumes/ota/files/OTA/dev/SensorNode}"
-OTA_BASE_URL="${OTA_BASE_URL:-http://ota.tartak.by/files/OTA/dev/SensorNode}"
+OTA_SERVER_PATH="${OTA_SERVER_PATH:-/volumes/ota/files/OTA/SensorNode/dev}"
+OTA_BASE_URL="${OTA_BASE_URL:-https://ota.tartak.by/files/OTA/SensorNode/dev}"
 
 # ─── MQTT config (used only if CHIP_ID is provided) ──────────────────────────
 MQTT_HOST="${MQTT_HOST:-mq.airmq.cc}"
@@ -46,25 +46,24 @@ if [ ! -f "$BIN" ]; then
     exit 1
 fi
 
-# ── Extract build number from platformio.ini ──────────────────────────────────
-BUILD=$(python3 -c "
-import sys, re
-env = sys.argv[1]
-with open('platformio.ini') as f: txt = f.read()
-sec = re.search(r'\[env:' + re.escape(env) + r'\](.+?)(?=^\[|\Z)', txt, re.M|re.S)
-if sec:
-    m = re.search(r'FW_BUILD=\"([^\"]+)\"', sec.group(1))
-    if m: print(m.group(1)); sys.exit(0)
-sys.exit(1)
-" "$ENV")
+# ── Extract build number from .build_counter (written by version.py) ─────────
+if [ ! -f ".build_counter" ]; then
+    echo "ERROR: .build_counter not found — did 'pio run' succeed?"
+    exit 1
+fi
+_date=$(cut -d: -f1 .build_counter)
+_num=$(cut -d: -f2 .build_counter)
+BUILD="${_date}$(printf '%02d' "$_num")"
 if [ -z "$BUILD" ]; then
-    echo "ERROR: could not extract FW_BUILD for env '$ENV' from platformio.ini"
+    echo "ERROR: could not parse .build_counter"
     exit 1
 fi
 
 REMOTE_BIN="firmware-${ENV}-${BUILD}.bin"
 LATEST_BIN="firmware-${ENV}-latest.bin"
-OTA_URL="${OTA_BASE_URL}/${LATEST_BIN}"
+# Binary download URL always uses HTTP — ESP8266 can't handle HTTPS for large downloads
+BIN_BASE_URL="${OTA_BASE_URL/https:\/\//http:\/\/}"
+OTA_URL="${BIN_BASE_URL}/${LATEST_BIN}"
 
 # Shorthand helpers for ssh/scp with the configured port
 SSH="ssh -p ${OTA_SSH_PORT} ${OTA_SSH_USER}@${OTA_SSH_ADDR}"

@@ -7,10 +7,14 @@
 #include "led.h"
 #include "platform.h"
 #include "queues.h"
+#include "sensors/sensor_manager.h"
 #include <ArduinoJson.h>
 #include <espMqttClient.h>
 #include <DNSServer.h>
 #include <time.h>
+
+// After publishStart, wait this long for a broker config command before enabling sensors
+#define STARTUP_CMD_WINDOW_MS 5000
 
 // ─── MQTT client (TLS or plain, selected at runtime) ─────────────────────────
 static espMqttClient*       mqttPlain  = nullptr;
@@ -37,6 +41,7 @@ static DNSServer dnsServer;
 static char      g_apSsid[24];
 static bool      apRequested = false;
 static MqttConfig mqttCfgData;
+static uint32_t  s_startupWindowMs = 0;   // set by publishStart(); sensors enabled after window
 
 #ifdef ESP8266
 // ── ESP8266 cooperative uplink state machine ──────────────────────────────────
@@ -72,24 +77,18 @@ static uint32_t getEpochTime() {
 static void publishSensorData(const SensorReading* batch, uint8_t count) {
     if (!MQTT_CONNECTED() || count == 0) return;
 
-    // Build JSON array merging base fields + sensor-specific data fields
+    // Build JSON array: deviceId + time + sensor data fields only
     String payload = "[";
     for (uint8_t i = 0; i < count; i++) {
         if (i > 0) payload += ',';
-        // Splice: strip trailing } from base, then append data fields
-        char base[128];
+        char base[64];
         snprintf(base, sizeof(base),
-                 "{\"deviceId\":%lu,\"time\":%lu,\"count\":%u,\"mV\":%u,\"rssi\":%d,\"msgType\":%u,",
+                 "{\"deviceId\":%lu,\"time\":%lu,",
                  (unsigned long)batch[i].deviceId,
-                 (unsigned long)batch[i].time,
-                 batch[i].count,
-                 batch[i].mV,
-                 batch[i].rssi,
-                 batch[i].msgType);
+                 (unsigned long)batch[i].time);
         payload += base;
-        // batch[i].data is like {"temp":21.5,...} — strip leading {
         const char* d = batch[i].data;
-        if (d[0] == '{') d++;  // skip opening brace; already have comma separator above
+        if (d[0] == '{') d++;  // skip leading '{'; comma already present above
         payload += d;
     }
     payload += ']';
@@ -97,7 +96,7 @@ static void publishSensorData(const SensorReading* batch, uint8_t count) {
     char topic[64];
     buildTopic(topic, sizeof(topic), TOPIC_DATA_SUFFIX);
     MQTT_PUBLISH(topic, 0, false, payload.c_str());
-    logMessage("Published " + String(count) + " readings → " + topic, "info");
+    logMessage("Published " + String(count) + " readings -> " + topic, "info");
 
     if (mqttSecure || mqttPlain) ledSetState(LED_MQTT_OK);
 }
@@ -108,27 +107,26 @@ void sendTelemetry() {
     if (!MQTT_CONNECTED()) return;
 
     STATE_LOCK();
-    uint32_t chipId    = sysState.chipId;
     uint32_t startTime = sysState.startTime;
     uint32_t readings  = sysState.readingCount;
-    uint8_t  active    = sysState.sensorsActive;
-    uint8_t  rstReason = sysState.resetReason;
     uint16_t teleInt   = sysState.teleIntervalM;
     STATE_UNLOCK();
 
     uint32_t now = millis() / 1000;
 
+#ifdef BOARD_ESP8266
+    float vcc = ESP.getVcc() / 1000.0f;
+#else
+    float vcc = 0.0f;
+#endif
+
     JsonDocument doc;
-    doc["id"]          = chipId;
-    doc["time"]        = getEpochTime();
-    doc["build"]       = FW_BUILD;
-    doc["uptime"]      = (now - startTime) / 60;
-    doc["readingCount"] = readings;
-    doc["sensorsActive"] = active;
+    doc["Uptime"]      = (now - startTime) / 60;
+    doc["RSSI"]        = WiFi.RSSI();
+    doc["VCC"]         = vcc;
     doc["freeHeap"]    = (uint32_t)FREE_HEAP();
-    doc["wifiRSSI"]    = WiFi.RSSI();
-    doc["rstReason"]   = rstReason;
     doc["curInterval"] = teleInt;
+    doc["seq"]         = readings;
 
     String payload;
     serializeJson(doc, payload);
@@ -136,7 +134,7 @@ void sendTelemetry() {
     char topic[64];
     buildTopic(topic, sizeof(topic), TOPIC_TELE_SUFFIX);
     MQTT_PUBLISH(topic, 0, false, payload.c_str());
-    logMessage(String("MQTT → ") + topic, "info");
+    logMessage(String("MQTT -> ") + topic, "info");
 
     STATE_SET(lastTeleSent, (int32_t)now);
 }
@@ -156,7 +154,9 @@ static void publishStart() {
     char topic[64];
     buildTopic(topic, sizeof(topic), TOPIC_START_SUFFIX);
     MQTT_PUBLISH(topic, 0, false, payload.c_str());
-    logMessage(String("MQTT → ") + topic, "info");
+    logMessage(String("MQTT -> ") + topic, "info");
+    if (s_startupWindowMs == 0)
+        s_startupWindowMs = millis();  // start the broker-response window
 }
 
 // ─── OTA via HTTP/HTTPS ───────────────────────────────────────────────────────
@@ -166,11 +166,21 @@ static int doHttpOta(const char* url) {
     logMessage(String("OTA: fetching ") + url, "info");
     ESPhttpUpdate.setLedPin(-1);
     ESPhttpUpdate.rebootOnUpdate(false);
+    static int s_lastPct;
+    s_lastPct = -1;
+    ESPhttpUpdate.onProgress([](int cur, int total) {
+        if (total <= 0) return;
+        int pct = (cur * 100) / total;
+        if (pct >= s_lastPct + 10) { s_lastPct = pct; logMessage(String(pct), "otapct"); loggerProcess(); }
+    });
+    // Flush queued log messages before blocking on update
+    while (uxQueueMessagesWaiting(logQueue)) loggerProcess();
     bool isHttps = (strncmp(url, "https", 5) == 0);
     HTTPUpdateResult res;
     if (isHttps) {
         BearSSL::WiFiClientSecure client;
         client.setInsecure();
+        client.setBufferSizes(512, 512);
         res = ESPhttpUpdate.update(client, url);
     } else {
         WiFiClient client;
@@ -178,9 +188,11 @@ static int doHttpOta(const char* url) {
     }
     if (res == HTTP_UPDATE_OK) {
         logMessage("OTA complete — rebooting", "info");
+        while (uxQueueMessagesWaiting(logQueue)) loggerProcess();
         return 0;
     }
     logMessage("OTA failed: " + String(ESPhttpUpdate.getLastErrorString()), "error");
+    while (uxQueueMessagesWaiting(logQueue)) loggerProcess();
     return 1;
 }
 #else
@@ -213,6 +225,13 @@ static int doHttpOta(const char* url) {
         http.end();
         return 2;
     }
+    static int s_lastPct;
+    s_lastPct = -1;
+    Update.onProgress([](size_t cur, size_t total) {
+        if (total == 0) return;
+        int pct = (int)((cur * 100) / total);
+        if (pct >= s_lastPct + 10) { s_lastPct = pct; logMessage(String(pct), "otapct"); }
+    });
     Update.writeStream(*http.getStreamPtr());
     if (!Update.end(true)) {
         logMessage("OTA failed: " + String(Update.errorString()), "error");
@@ -237,7 +256,7 @@ static void doOtaCheck() {
     WiFiClient       plainClient;
     HTTPClient http;
 #ifdef ESP8266
-    if (isHttps) { secureClient.setInsecure(); http.begin(secureClient, OTA_VERSION_URL); }
+    if (isHttps) { secureClient.setInsecure(); secureClient.setBufferSizes(512, 512); http.begin(secureClient, OTA_VERSION_URL); }
     else          { http.begin(plainClient, OTA_VERSION_URL); }
 #else
     if (isHttps) { secureClient.setInsecure(); http.begin(secureClient, OTA_VERSION_URL); }
@@ -256,9 +275,9 @@ static void doOtaCheck() {
     if (!remoteBuild || !binUrl) { logMessage("OTA version JSON missing fields", "error"); return; }
     if (strcmp(remoteBuild, FW_BUILD) == 0) { logMessage(String("OTA: up to date (") + FW_BUILD + ")", "info"); return; }
 
-    logMessage(String("OTA: new build ") + remoteBuild + " → updating", "info");
+    logMessage(String("OTA: new build ") + remoteBuild + " -> updating", "info");
     int result = doHttpOta(binUrl);
-    if (result == 0) { vTaskDelay(pdMS_TO_TICKS(200)); DEVICE_RESTART(); }
+    if (result == 0) { vTaskDelay(pdMS_TO_TICKS(500)); DEVICE_RESTART(); }
 }
 
 // ─── MQTT command handler ─────────────────────────────────────────────────────
@@ -270,31 +289,39 @@ static void handleCommand(const char* payload) {
         return;
     }
 
+    bool needsSave = false;
+
     if (!doc["teleIntervalM"].isNull()) {
-        uint16_t v = doc["teleIntervalM"];
-        STATE_SET(teleIntervalM, v);
-        logMessage("teleIntervalM → " + String(v), "info");
+        STATE_SET(teleIntervalM, (uint16_t)doc["teleIntervalM"]);
+        needsSave = true;
     }
 
     if (!doc["sampleNum"].isNull()) {
-        int8_t v = doc["sampleNum"];
-        STATE_SET(sampleNum, v);
-        logMessage("sampleNum → " + String(v), "info");
+        STATE_SET(sampleNum, (int8_t)doc["sampleNum"]);
+        needsSave = true;
     }
 
-    if (!doc["sensorConf"].isNull()) {
-        if (xSemaphoreTake(sensorConfMutex, pdMS_TO_TICKS(1000))) {
-            sensorConfData = doc["sensorConf"];
-            xSemaphoreGive(sensorConfMutex);
-        }
-        saveSensorConf();
-        logMessage("sensorConf updated", "info");
+    if (!doc["onTime"].isNull()) {
+        uint16_t v = doc["onTime"];
+        if (v < 30) v = 30;
+        STATE_SET(onTime, v);
+        needsSave = true;
+    }
+
+    if (needsSave) {
+        HwConfig hw;
+        loadHwConfig(hw);
+        hw.teleIntervalM = STATE_GET(teleIntervalM);
+        hw.sampleNum     = STATE_GET(sampleNum);
+        hw.onTime        = STATE_GET(onTime);
+        saveHwConfig(hw);
+        logMessage("hwconfig saved", "info");
     }
 
     if (!doc["debugLog"].isNull()) {
         bool en = doc["debugLog"].as<bool>();
         setDebugLog(en);
-        logMessage(String("debugLog → ") + (en ? "on" : "off"), "info");
+        logMessage(String("debugLog -> ") + (en ? "on" : "off"), "info");
     }
 
     if (doc["ota"].is<const char*>()) {
@@ -324,7 +351,7 @@ static void handleCommand(const char* payload) {
 
 static void onMqttConnect(bool) {
     STATE_SET(mqttConnected, true);
-    logMessage("MQTT connected", "info");
+    logMessage("MQTT connected (heap:" + String(FREE_HEAP()) + ")", "info");
     ledSetState(LED_MQTT_OK);
 
     char cmdTopic[64];
@@ -332,25 +359,43 @@ static void onMqttConnect(bool) {
              mqttCfgData.prefix,
              (unsigned long)STATE_GET(chipId),
              TOPIC_CMD_SUFFIX);
-    MQTT_SUBSCRIBE(cmdTopic, 0);
-    logMessage("Subscribed: " + String(cmdTopic), "info");
-    publishStart();
+    uint16_t subId = 0;
+    if (mqttSecure) subId = mqttSecure->subscribe(cmdTopic, 0);
+    else if (mqttPlain) subId = mqttPlain->subscribe(cmdTopic, 0);
+    if (subId) logMessage("Subscribed: " + String(cmdTopic), "info");
+    else {
+        logMessage("Subscribe FAILED (heap:" + String(FREE_HEAP()) + ")", "error");
+        publishStart();  // no subscription, publish immediately
+    }
 }
 
 static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
     STATE_SET(mqttConnected, false);
     ledSetState(LED_CONNECTING);
-    logMessage("MQTT disconnected: " + String((int)reason), "warn");
+    logMessage(String("MQTT disconnected: ") + espMqttClientTypes::disconnectReasonToString(reason), "warn");
+}
+
+static void onMqttSubscribe(uint16_t packetId, const espMqttClientTypes::SubscribeReturncode* codes, size_t len) {
+    for (size_t i = 0; i < len; ++i) {
+        if (codes[i] == espMqttClientTypes::SubscribeReturncode::FAIL) {
+            logMessage("Subscribe ACK REJECTED (id:" + String(packetId) + ")", "error");
+            publishStart();  // still announce even if subscription failed
+        } else {
+            logMessage("Subscribe ACK ok (id:" + String(packetId) + ")", "info");
+            publishStart();  // subscription confirmed — safe to announce
+        }
+    }
 }
 
 static void onMqttMessage(const espMqttClientTypes::MessageProperties&,
-                           const char*, const uint8_t* payload,
+                           const char* topic, const uint8_t* payload,
                            size_t len, size_t index, size_t total) {
     if (index == 0 && len == total) {
         MqttCommand cmd;
         size_t copyLen = len < sizeof(cmd.payload) - 1 ? len : sizeof(cmd.payload) - 1;
         memcpy(cmd.payload, payload, copyLen);
         cmd.payload[copyLen] = '\0';
+        logMessage(String("MQTT rx [") + topic + "]: " + cmd.payload, "info");
         xQueueSend(cmdQueue, &cmd, 0);
     }
 }
@@ -359,8 +404,9 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties&,
 
 static void initMqtt() {
     STATE_LOCK();
-    char sysname[17];
-    strncpy(sysname, sysState.sysname, sizeof(sysname));
+    static char sysname[17];
+    strncpy(sysname, sysState.sysname, sizeof(sysname) - 1);
+    sysname[sizeof(sysname) - 1] = '\0';
     STATE_UNLOCK();
 
     if (mqttCfgData.tls) {
@@ -368,6 +414,7 @@ static void initMqtt() {
         mqttSecure->setInsecure();
         mqttSecure->onConnect(onMqttConnect);
         mqttSecure->onDisconnect(onMqttDisconnect);
+        mqttSecure->onSubscribe(onMqttSubscribe);
         mqttSecure->onMessage(onMqttMessage);
         mqttSecure->setServer(mqttCfgData.broker, mqttCfgData.port);
         mqttSecure->setClientId(sysname);
@@ -378,6 +425,7 @@ static void initMqtt() {
         if (!mqttPlain) mqttPlain = new espMqttClient();
         mqttPlain->onConnect(onMqttConnect);
         mqttPlain->onDisconnect(onMqttDisconnect);
+        mqttPlain->onSubscribe(onMqttSubscribe);
         mqttPlain->onMessage(onMqttMessage);
         mqttPlain->setServer(mqttCfgData.broker, mqttCfgData.port);
         mqttPlain->setClientId(sysname);
@@ -410,11 +458,11 @@ static bool wifiApWindow(const char* ssid1, const char* pass1,
     if (hasPrimary) {
         WiFi.setHostname(g_apSsid);
         WiFi.begin(ssid1, pass1);
-        logMessage(String("STA → ") + ssid1, "info");
+        logMessage(String("STA -> ") + ssid1, "info");
     } else if (hasSecondary) {
         WiFi.setHostname(g_apSsid);
         WiFi.begin(ssid2, pass2);
-        logMessage(String("STA → ") + ssid2, "info");
+        logMessage(String("STA -> ") + ssid2, "info");
     }
 
     uint32_t t0       = millis();
@@ -438,7 +486,7 @@ static bool wifiApWindow(const char* ssid1, const char* pass1,
             triedSecondary = true;
             WiFi.disconnect(false);
             WiFi.begin(ssid2, pass2);
-            logMessage(String("STA fallback → ") + ssid2, "info");
+            logMessage(String("STA fallback -> ") + ssid2, "info");
         }
 
         vTaskDelay(pdMS_TO_TICKS(50));
@@ -453,7 +501,7 @@ static bool wifiApWindow(const char* ssid1, const char* pass1,
 void uplinkTask(void* pvParameters) {
     loadMqttConfig(mqttCfgData);
 
-    snprintf(g_apSsid, sizeof(g_apSsid), "SNode-%lu",
+    snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
              (unsigned long)STATE_GET(chipId));
 
     char wifiSsid[33] = {}, wifiPass[65] = {};
@@ -510,6 +558,10 @@ void uplinkTask(void* pvParameters) {
         if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE)
             handleCommand(cmd.payload);
 
+        // Enable sensors after startup command window expires
+        if (s_startupWindowMs && millis() - s_startupWindowMs >= STARTUP_CMD_WINDOW_MS)
+            sensorsEnable();
+
         int8_t sn = STATE_GET(sampleNum);
         if (batchCount >= sn && batchCount > 0) {
             publishSensorData(batch, batchCount);
@@ -562,7 +614,7 @@ void uplinkTask(void* pvParameters) {
 
 void uplinkInit() {
     loadMqttConfig(mqttCfgData);
-    snprintf(g_apSsid, sizeof(g_apSsid), "SNode-%lu",
+    snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
              (unsigned long)STATE_GET(chipId));
     loadWifiCreds(s_ssid, sizeof(s_ssid), s_pass, sizeof(s_pass),
                   s_ssid2, sizeof(s_ssid2), s_pass2, sizeof(s_pass2));
@@ -579,11 +631,11 @@ void uplinkInit() {
     if (hasPrimary) {
         WiFi.setHostname(g_apSsid);
         WiFi.begin(s_ssid, s_pass);
-        logMessage(String("STA → ") + s_ssid, "info");
+        logMessage(String("STA -> ") + s_ssid, "info");
     } else if (hasSecondary) {
         WiFi.setHostname(g_apSsid);
         WiFi.begin(s_ssid2, s_pass2);
-        logMessage(String("STA → ") + s_ssid2, "info");
+        logMessage(String("STA -> ") + s_ssid2, "info");
     }
 
     s_apWindowStart  = millis();
@@ -622,7 +674,7 @@ void uplinkProcess() {
             s_triedSecondary = true;
             WiFi.disconnect(false);
             WiFi.begin(s_ssid2, s_pass2);
-            logMessage(String("STA fallback → ") + s_ssid2, "info");
+            logMessage(String("STA fallback -> ") + s_ssid2, "info");
         }
         if (millis() - s_apWindowStart > AP_WINDOW_MS) {
             logMessage("AP window expired — no STA", "warn");
@@ -657,6 +709,10 @@ void uplinkProcess() {
             MqttCommand cmd;
             if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE)
                 handleCommand(cmd.payload);
+
+            // Enable sensors after startup command window expires
+            if (s_startupWindowMs && millis() - s_startupWindowMs >= STARTUP_CMD_WINDOW_MS)
+                sensorsEnable();
 
             int8_t sn = STATE_GET(sampleNum);
             if (s_batchCount >= sn && s_batchCount > 0) {

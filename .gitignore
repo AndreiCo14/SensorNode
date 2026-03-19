@@ -14,3 +14,6 @@ logs/
 # Env files with real credentials (committed examples live in .env.example / .env.firmware.example)
 .env
 .env.firmware
+
+# Auto-generated build counter (YYYYMMDD:N)
+.build_counter

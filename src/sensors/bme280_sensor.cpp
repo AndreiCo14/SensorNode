@@ -33,7 +33,7 @@ bool Bme280Sensor::read(SensorReading& r) {
 
     r.msgType = msgType();
     snprintf(r.data, sizeof(r.data),
-             "{\"temp\":%.2f,\"hum\":%.1f,\"press\":%.2f}",
+             "{\"Temp\":%.2f,\"Hum\":%.1f,\"Press\":%.2f}",
              temp, hum, press);
     return true;
 }

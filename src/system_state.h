@@ -16,6 +16,7 @@ struct SystemState {
     // Config
     uint16_t teleIntervalM;
     int8_t   sampleNum;
+    uint16_t onTime;            // PMS7003 warmup/on duration (seconds)
 
     // Status
     bool     mqttConnected;
@@ -28,7 +29,7 @@ struct SystemState {
 
     // Chip
     uint32_t chipId;
-    char     sysname[17];       // "SNode_<chipId>"
+    char     sysname[17];       // "AirMQ_<chipId>"
 
     // Boot diagnostics
     uint8_t  resetReason;

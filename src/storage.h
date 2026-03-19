@@ -18,19 +18,21 @@ struct MqttConfig {
 };
 
 struct HwConfig {
-    int8_t  i2c_sda;
-    int8_t  i2c_scl;
-    int8_t  uart_rx;
-    int8_t  uart_tx;
-    int8_t  onewire;
-    int8_t  led_pin;
+    int8_t   i2c_sda;
+    int8_t   i2c_scl;
+    int8_t   uart_rx;
+    int8_t   uart_tx;
+    int8_t   onewire;
+    int8_t   led_pin;
     uint16_t intervalSec;
+    // Operational params — persisted so they survive reboots
+    uint16_t teleIntervalM;
+    int8_t   sampleNum;
+    uint16_t onTime;
 };
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
-extern JsonDocument sensorConfData;     // /sensorconf.json  (label mapping)
 extern JsonDocument sensorSetupData;    // /sensorsetup.json (enable/disable)
-extern SemaphoreHandle_t sensorConfMutex;
 extern SemaphoreHandle_t sensorSetupMutex;
 extern bool lfsReady;
 
@@ -55,6 +57,3 @@ bool saveHwConfig(const HwConfig& cfg);
 bool loadSensorSetup();
 bool saveSensorSetup();
 
-// ─── Sensor label config (display names) ─────────────────────────────────────
-bool loadSensorConf();
-bool saveSensorConf();

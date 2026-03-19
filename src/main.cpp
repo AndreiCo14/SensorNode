@@ -12,7 +12,9 @@
 #include "webserver.h"
 #include "sensors/sensor_manager.h"
 
-#ifndef ESP8266
+#ifdef ESP8266
+ADC_MODE(ADC_VCC);  // ESP.getVcc() reads the supply rail, not TOUT pin
+#else
 #  include "esp_system.h"
 #endif
 
@@ -62,13 +64,14 @@ void setup() {
     sysState.chipId          = chipId;
     sysState.teleIntervalM   = DEFAULT_TELE_INTERVAL_M;
     sysState.sampleNum       = DEFAULT_SAMPLE_NUM;
+    sysState.onTime          = 30;
     sysState.startTime       = millis() / 1000;
     sysState.mqttConnected   = false;
     sysState.wifiConnected   = false;
     sysState.apMode          = false;
     sysState.sensorsActive   = 0;
     sysState.readingCount    = 0;
-    snprintf(sysState.sysname, sizeof(sysState.sysname), "SNode_%lu",
+    snprintf(sysState.sysname, sizeof(sysState.sysname), "AirMQ_%lu",
              (unsigned long)chipId);
     STATE_UNLOCK();
     Serial.printf("Chip ID: %lu  Name: %s\r\n", (unsigned long)chipId, sysState.sysname);
@@ -85,15 +88,20 @@ void setup() {
     // ── Storage ──
     if (!storageInit())
         Serial.println("Storage init failed — continuing without config");
-    loadSensorConf();
     loadSensorSetup();
 
-    // ── LED (pin set by hwconfig, initialised after storage load) ──
+    // ── LED + persisted operational params ──
     {
         HwConfig hw;
         loadHwConfig(hw);
         ledInit(hw.led_pin);
         ledSetState(LED_BOOT);
+        // Override RAM defaults with persisted values
+        STATE_LOCK();
+        sysState.teleIntervalM = hw.teleIntervalM;
+        sysState.sampleNum     = hw.sampleNum;
+        sysState.onTime        = hw.onTime;
+        STATE_UNLOCK();
     }
 
     // ── Init sensors ──
