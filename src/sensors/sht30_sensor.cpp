@@ -30,6 +30,8 @@ bool Sht30Sensor::read(SensorReading& r) {
         return false;
     }
 
+    _lastTemp = temp;
+    _lastHum  = hum;
     r.msgType = msgType();
     snprintf(r.data, sizeof(r.data),
              "{\"Temp\":%.2f,\"Hum\":%.1f}",

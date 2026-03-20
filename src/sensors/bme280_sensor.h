@@ -7,10 +7,15 @@ public:
     bool isReady() override;
     bool read(SensorReading& r) override;
     const char* type() const override { return "bme280"; }
-    uint8_t msgType() const override { return 202; }
+    uint8_t msgType()    const override { return 202; }
+    uint8_t i2cAddr()    const override { return _addr; }
+    void    setAddr(uint8_t a) override { _addr = a; }
+    float   lastTemp()   const override { return _lastTemp; }
+    float   lastHum()    const override { return _lastHum; }
+    bool    providesTH() const override { return true; }
 private:
-    bool _ready = false;
-    uint8_t _addr = 0x76;
-public:
-    void setAddr(uint8_t addr) { _addr = addr; }
+    bool    _ready    = false;
+    uint8_t _addr     = 0x76;
+    float   _lastTemp = 25.0f;
+    float   _lastHum  = 50.0f;
 };

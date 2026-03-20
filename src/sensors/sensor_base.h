@@ -25,12 +25,29 @@ public:
     virtual bool read(SensorReading& r) = 0;
 
     // Periodic tick — called every loop iteration; default is no-op.
-    // Returns true to request an immediate combined sensor read (e.g. PMS7003 ready).
-    virtual bool tick() { return false; }
+    // nextReadMs: absolute millis() when the next scheduled read will occur,
+    // so sensors that need warm-up (e.g. PMS7003) can start ahead of time.
+    // Returns value is ignored — reads are triggered only by the interval timer.
+    virtual void tick(uint32_t nextReadMs) { (void)nextReadMs; }
 
     // Short type identifier string: "bme280", "sht30", "ds18b20", ...
     virtual const char* type() const = 0;
 
     // MQTT msgType numeric identifier
     virtual uint8_t msgType() const = 0;
+
+    // I2C address (0 = not an I2C sensor)
+    virtual uint8_t i2cAddr() const { return 0; }
+
+    // Set I2C address (no-op for non-I2C or fixed-address sensors)
+    virtual void setAddr(uint8_t) {}
+
+    // Last measured temperature (°C) — valid only if providesTH() is true
+    virtual float lastTemp() const { return 25.0f; }
+
+    // Last measured relative humidity (%RH) — valid only if providesTH() is true
+    virtual float lastHum()  const { return 50.0f; }
+
+    // Returns true if this sensor measures temperature and humidity
+    virtual bool  providesTH() const { return false; }
 };

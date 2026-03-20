@@ -31,6 +31,8 @@ bool Bme280Sensor::read(SensorReading& r) {
     float hum   = bme.readFloatHumidity();
     float press = bme.readFloatPressure() / 100.0f;  // Pa → hPa
 
+    _lastTemp = temp;
+    _lastHum  = hum;
     r.msgType = msgType();
     snprintf(r.data, sizeof(r.data),
              "{\"Temp\":%.2f,\"Hum\":%.1f,\"Press\":%.2f}",

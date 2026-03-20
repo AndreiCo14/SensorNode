@@ -313,6 +313,24 @@ static void handleOtaResponse() {
     }
 }
 
+// ─── POST /api/config/reset ───────────────────────────────────────────────────
+
+static void handleConfigReset() {
+    JsonDocument req;
+    if (httpServer.hasArg("plain")) deserializeJson(req, httpServer.arg("plain"));
+    bool keepWifi = req["preserve_wifi"] | false;
+    bool keepMqtt = req["preserve_mqtt"] | false;
+
+    if (!keepWifi) LittleFS.remove(WIFI_CONF_PATH);
+    if (!keepMqtt) LittleFS.remove(MQTT_CONF_PATH);
+    LittleFS.remove(HW_CONF_PATH);
+    LittleFS.remove(SENSOR_SETUP_PATH);
+
+    logMessage("Config reset — rebooting", "warn");
+    sendJson(200, "{\"ok\":true,\"msg\":\"Config reset — rebooting\"}");
+    rebootPending = true;
+}
+
 // ─── GET /api/fs ──────────────────────────────────────────────────────────────
 
 static void handleGetFs() {
@@ -396,6 +414,7 @@ static void webServerSetup() {
     httpServer.on("/api/sensors/setup", HTTP_GET,  handleGetSensorSetup);
     httpServer.on("/api/sensors/setup", HTTP_POST, handlePostSensorSetup);
     httpServer.on("/api/config/export", HTTP_GET,  handleGetConfigExport);
+    httpServer.on("/api/config/reset",  HTTP_POST, handleConfigReset);
 
     // Other
     httpServer.on("/api/state",      HTTP_GET,  handleGetState);

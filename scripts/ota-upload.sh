@@ -38,7 +38,7 @@ CHIP_ID=${2:-""}
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 echo "=== Building env: $ENV ==="
-pio run -e "$ENV"
+OTA_RELEASE=1 pio run -e "$ENV"
 
 BIN=".pio/build/$ENV/firmware.bin"
 if [ ! -f "$BIN" ]; then

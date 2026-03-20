@@ -2,7 +2,9 @@
 PlatformIO pre-build script: generates FW_BUILD as YYYYMMDDNN.
 
 Reads/writes .build_counter (format: YYYYMMDD:N) at the project root.
-The counter resets to 1 on a new day, increments on each build run.
+Counter increments only when OTA_RELEASE=1 is set in the environment
+(i.e. when called from ota-upload.sh). Plain 'pio run' reuses the last
+counter value so the build number doesn't change on every dev build.
 Multiple environments built in one pio invocation share the same version
 via os.environ so the counter only increments once per run.
 """
@@ -17,18 +19,26 @@ def get_build_version():
 
     today = datetime.date.today().strftime("%Y%m%d")
     counter_file = os.path.join(env.subst("$PROJECT_DIR"), ".build_counter")  # noqa: F821
+    release = os.environ.get("OTA_RELEASE") == "1"
 
-    counter = 1
+    stored_date, stored_n = today, 0
     if os.path.exists(counter_file):
         try:
-            date_str, _, n_str = open(counter_file).read().strip().partition(":")
-            if date_str == today:
-                counter = int(n_str) + 1
+            d, _, n = open(counter_file).read().strip().partition(":")
+            stored_date, stored_n = d, int(n)
         except (ValueError, OSError):
             pass
 
-    with open(counter_file, "w") as f:
-        f.write("{}:{}".format(today, counter))
+    if release:
+        if stored_date == today:
+            counter = stored_n + 1
+        else:
+            counter = 1
+        with open(counter_file, "w") as f:
+            f.write("{}:{}".format(today, counter))
+    else:
+        # Dev build: reuse last counter without incrementing
+        counter = stored_n if stored_date == today else 0
 
     version = "{}{:02d}".format(today, counter)
     os.environ["FW_BUILD_VERSION"] = version

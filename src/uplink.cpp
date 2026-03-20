@@ -163,35 +163,41 @@ static void publishStart() {
 
 #ifdef ESP8266
 static int doHttpOta(const char* url) {
-    logMessage(String("OTA: fetching ") + url, "info");
     ESPhttpUpdate.setLedPin(-1);
     ESPhttpUpdate.rebootOnUpdate(false);
     static int s_lastPct;
-    s_lastPct = -1;
     ESPhttpUpdate.onProgress([](int cur, int total) {
         if (total <= 0) return;
         int pct = (cur * 100) / total;
-        if (pct >= s_lastPct + 10) { s_lastPct = pct; logMessage(String(pct), "otapct"); loggerProcess(); }
+        if (pct >= s_lastPct + 10) { s_lastPct = pct; logMessage(String(pct), "otapct"); }
     });
-    // Flush queued log messages before blocking on update
-    while (uxQueueMessagesWaiting(logQueue)) loggerProcess();
     bool isHttps = (strncmp(url, "https", 5) == 0);
-    HTTPUpdateResult res;
-    if (isHttps) {
-        BearSSL::WiFiClientSecure client;
-        client.setInsecure();
-        client.setBufferSizes(512, 512);
-        res = ESPhttpUpdate.update(client, url);
-    } else {
-        WiFiClient client;
-        res = ESPhttpUpdate.update(client, url);
-    }
-    if (res == HTTP_UPDATE_OK) {
-        logMessage("OTA complete — rebooting", "info");
+    for (int attempt = 1; attempt <= 2; attempt++) {
+        logMessage(String("OTA: fetching ") + url + (attempt > 1 ? " (retry)" : ""), "info");
+        // Flush queued log messages before blocking on update
         while (uxQueueMessagesWaiting(logQueue)) loggerProcess();
-        return 0;
+        s_lastPct = -1;
+        HTTPUpdateResult res;
+        if (isHttps) {
+            BearSSL::WiFiClientSecure client;
+            client.setInsecure();
+            client.setBufferSizes(512, 512);
+            res = ESPhttpUpdate.update(client, url);
+        } else {
+            WiFiClient client;
+            res = ESPhttpUpdate.update(client, url);
+        }
+        if (res == HTTP_UPDATE_OK) {
+            logMessage("OTA complete — rebooting", "info");
+            while (uxQueueMessagesWaiting(logQueue)) loggerProcess();
+            return 0;
+        }
+        logMessage("OTA failed: " + String(ESPhttpUpdate.getLastErrorString()), "error");
+        if (attempt < 2) {
+            logMessage("OTA retry in 5s...", "warn");
+            delay(5000);
+        }
     }
-    logMessage("OTA failed: " + String(ESPhttpUpdate.getLastErrorString()), "error");
     while (uxQueueMessagesWaiting(logQueue)) loggerProcess();
     return 1;
 }
@@ -245,11 +251,19 @@ static int doHttpOta(const char* url) {
 #endif
 
 static void doOtaCheck() {
+#ifdef ESP8266
+#define OTA_FLUSH() do { while (uxQueueMessagesWaiting(logQueue)) loggerProcess(); } while(0)
+#else
+#define OTA_FLUSH() do {} while(0)
+#endif
+
     if (strlen(OTA_VERSION_URL) == 0) {
         logMessage("OTA_VERSION_URL not set", "warn");
+        OTA_FLUSH();
         return;
     }
     logMessage("OTA check: " + String(OTA_VERSION_URL), "info");
+    OTA_FLUSH();  // send before blocking HTTPS request
 
     bool isHttps = (strncmp(OTA_VERSION_URL, "https", 5) == 0);
     WiFiClientSecure secureClient;
@@ -264,20 +278,40 @@ static void doOtaCheck() {
 #endif
     http.setTimeout(10000);
     int code = http.GET();
-    if (code != HTTP_CODE_OK) { logMessage("OTA check failed: " + String(code), "error"); http.end(); return; }
+    if (code != HTTP_CODE_OK) {
+        logMessage("OTA check failed: " + String(code), "error");
+        http.end();
+        OTA_FLUSH();
+        return;
+    }
 
     JsonDocument doc;
-    if (deserializeJson(doc, http.getString())) { http.end(); logMessage("OTA version JSON invalid", "error"); return; }
+    if (deserializeJson(doc, http.getString())) {
+        http.end();
+        logMessage("OTA version JSON invalid", "error");
+        OTA_FLUSH();
+        return;
+    }
     http.end();
 
     const char* remoteBuild = doc["build"];
     const char* binUrl      = doc["url"];
-    if (!remoteBuild || !binUrl) { logMessage("OTA version JSON missing fields", "error"); return; }
-    if (strcmp(remoteBuild, FW_BUILD) == 0) { logMessage(String("OTA: up to date (") + FW_BUILD + ")", "info"); return; }
+    if (!remoteBuild || !binUrl) {
+        logMessage("OTA version JSON missing fields", "error");
+        OTA_FLUSH();
+        return;
+    }
+    if (strcmp(remoteBuild, FW_BUILD) == 0) {
+        logMessage(String("OTA: up to date (") + FW_BUILD + ")", "info");
+        OTA_FLUSH();
+        return;
+    }
 
     logMessage(String("OTA: new build ") + remoteBuild + " -> updating", "info");
     int result = doHttpOta(binUrl);
     if (result == 0) { vTaskDelay(pdMS_TO_TICKS(500)); DEVICE_RESTART(); }
+
+#undef OTA_FLUSH
 }
 
 // ─── MQTT command handler ─────────────────────────────────────────────────────

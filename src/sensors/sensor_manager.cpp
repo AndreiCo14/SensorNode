@@ -3,6 +3,12 @@
 #include "sht30_sensor.h"
 #include "ds18b20_sensor.h"
 #include "pms7003_sensor.h"
+#include "scd4x_sensor.h"
+#include "sgp4x_sensor.h"
+#include "sht4x_sensor.h"
+#include "bmp280_sensor.h"
+#include "bmp580_sensor.h"
+#include "htu21d_sensor.h"
 #include "../logger.h"
 #include "../queues.h"
 #include "../system_state.h"
@@ -25,6 +31,12 @@ static SensorBase* makeSensor(const char* type) {
     if (strcmp(type, "sht30")   == 0) return new Sht30Sensor();
     if (strcmp(type, "ds18b20") == 0) return new Ds18b20Sensor();
     if (strcmp(type, "pms7003") == 0) return new Pms7003Sensor();
+    if (strcmp(type, "scd4x")   == 0) return new Scd4xSensor();
+    if (strcmp(type, "sgp4x")   == 0) return new Sgp4xSensor();
+    if (strcmp(type, "sht4x")   == 0) return new Sht4xSensor();
+    if (strcmp(type, "bmp280")  == 0) return new Bmp280Sensor();
+    if (strcmp(type, "bmp580")  == 0) return new Bmp580Sensor();
+    if (strcmp(type, "htu21d")  == 0) return new Htu21dSensor();
     return nullptr;
 }
 
@@ -61,13 +73,25 @@ void sensorsInit() {
             continue;
         }
 
-        // Set I2C address if present
+        // Set I2C address if provided in config
         uint8_t addr = entry["addr"] | 0;
-        if (addr > 0) {
-            if (strcmp(type, "bme280") == 0)
-                static_cast<Bme280Sensor*>(s)->setAddr(addr);
-            else if (strcmp(type, "sht30") == 0)
-                static_cast<Sht30Sensor*>(s)->setAddr(addr);
+        if (addr > 0) s->setAddr(addr);
+
+        // Check for I2C address collisions before initialising
+        uint8_t sAddr = s->i2cAddr();
+        if (sAddr != 0) {
+            bool conflict = false;
+            for (uint8_t j = 0; j < sensorCount; j++) {
+                if (sensors[j] && sensors[j]->i2cAddr() == sAddr) {
+                    logMessage(String("I2C conflict: ") + type +
+                               " @ 0x" + String(sAddr, HEX) +
+                               " already used by " + sensors[j]->type() +
+                               " — skipped", "error");
+                    conflict = true;
+                    break;
+                }
+            }
+            if (conflict) { delete s; continue; }
         }
 
         bool ok = s->begin(hwCfg.i2c_sda, hwCfg.i2c_scl,
@@ -79,6 +103,25 @@ void sensorsInit() {
     }
 
     xSemaphoreGive(sensorSetupMutex);
+
+    // Wire up SGP4x compensation source — use the first active T/H sensor
+    Sgp4xSensor* sgp4x = nullptr;
+    SensorBase*  thSrc  = nullptr;
+    for (uint8_t i = 0; i < sensorCount; i++) {
+        if (!sensors[i] || !sensors[i]->isReady()) continue;
+        if (!sgp4x && strcmp(sensors[i]->type(), "sgp4x") == 0)
+            sgp4x = static_cast<Sgp4xSensor*>(sensors[i]);
+        else if (!thSrc && sensors[i]->providesTH())
+            thSrc = sensors[i];
+    }
+    if (sgp4x) {
+        if (thSrc) {
+            sgp4x->setCompensationSource(thSrc);
+            logMessage(String("SGP4x: compensation from ") + thSrc->type(), "info");
+        } else {
+            logMessage("SGP4x: no T/H source — using default compensation (25°C, 50%RH)", "info");
+        }
+    }
 
     STATE_SET(sensorsActive, activeCount);
     logMessage("Sensors: " + String(sensorCount) + " configured, " +
@@ -160,23 +203,20 @@ static void doSensorRead() {
     ledUpdate();
 }
 
-static bool tickAllSensors() {
-    bool triggered = false;
+static void tickAllSensors(uint32_t nextReadMs) {
     for (uint8_t i = 0; i < sensorCount; i++)
-        if (sensors[i] && sensors[i]->tick())
-            triggered = true;
-    return triggered;
+        if (sensors[i]) sensors[i]->tick(nextReadMs);
 }
 
 void sensorTask(void* pvParameters) {
     for (;;) {
         if (s_enabled) {
-            bool triggered = tickAllSensors();
             uint32_t now = millis();
             uint16_t intervalM = STATE_GET(teleIntervalM);
             if (intervalM == 0) intervalM = 1;
             uint32_t intervalMs = (uint32_t)intervalM * 60000UL;
-            if (triggered || now - s_lastRead >= intervalMs)
+            tickAllSensors(s_lastRead + intervalMs);
+            if (now - s_lastRead >= intervalMs)
                 doSensorRead();
         }
         vTaskDelay(pdMS_TO_TICKS(500));
@@ -186,12 +226,12 @@ void sensorTask(void* pvParameters) {
 #ifdef ESP8266
 void sensorProcess() {
     if (!s_enabled) return;
-    bool triggered = tickAllSensors();
     uint32_t now = millis();
     uint16_t intervalM = STATE_GET(teleIntervalM);
     if (intervalM == 0) intervalM = 1;
     uint32_t intervalMs = (uint32_t)intervalM * 60000UL;
-    if (triggered || now - s_lastRead >= intervalMs)
+    tickAllSensors(s_lastRead + intervalMs);
+    if (now - s_lastRead >= intervalMs)
         doSensorRead();
 }
 #endif

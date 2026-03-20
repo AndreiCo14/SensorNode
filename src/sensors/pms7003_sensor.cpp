@@ -59,10 +59,9 @@ bool Pms7003Sensor::begin(int, int, int, int, int) {
     pinMode(PMS_PIN_INV, OUTPUT);
     digitalWrite(PMS_PIN_PWR, LOW);
     digitalWrite(PMS_PIN_INV, HIGH);
-    _state        = State::IDLE;
-    _lastCycleMs  = 0;   // 0 → first cycle starts immediately
-    _rbHead       = 0;
-    _rbCount      = 0;
+    _state    = State::IDLE;
+    _rbHead   = 0;
+    _rbCount  = 0;
     return true;
 }
 
@@ -77,26 +76,26 @@ bool Pms7003Sensor::read(SensorReading& r) {
              "{\"PMS1\":%.1f,\"PMS25\":%.1f,\"PMS10\":%.1f}",
              _pm1, _pm25, _pm10);
     powerOff();
-    _lastCycleMs = millis();
     _state = State::IDLE;
     return true;
 }
 
-bool Pms7003Sensor::tick() {
+void Pms7003Sensor::tick(uint32_t nextReadMs) {
     switch (_state) {
     case State::IDLE: {
-        uint16_t intervalM = STATE_GET(teleIntervalM);
-        if (intervalM == 0) intervalM = 30;
-        uint32_t intervalMs = (uint32_t)intervalM * 60000UL;
-        if (_lastCycleMs == 0 || (millis() - _lastCycleMs >= intervalMs)) {
-            _rbHead  = 0;
-            _rbCount = 0;
-            _bufPos  = 0;
-            _powerOnMs = millis();
+        uint16_t onTimeSec = STATE_GET(onTime);
+        if (onTimeSec < PMS_DEFAULT_ONTIME) onTimeSec = PMS_DEFAULT_ONTIME;
+        uint32_t now = millis();
+        // Start warm-up when there is just enough time to complete before the next read
+        if (now + (uint32_t)onTimeSec * 1000UL >= nextReadMs) {
+            _rbHead    = 0;
+            _rbCount   = 0;
+            _bufPos    = 0;
+            _powerOnMs = now;
             powerOn();
             _state = State::WARMING;
         }
-        return false;
+        return;
     }
 
     case State::WARMING: {
@@ -115,19 +114,16 @@ bool Pms7003Sensor::tick() {
                 _pm25 = (float)s25 / _rbCount;
                 _pm10 = (float)s10 / _rbCount;
                 _state = State::DATA_READY;
-                return true;  // trigger immediate combined read
             } else {
                 logMessage("PMS7003: no frames after warmup", "warn");
                 powerOff();
-                _lastCycleMs = millis();
                 _state = State::IDLE;
             }
         }
-        return false;
+        return;
     }
 
     case State::DATA_READY:
-        return false;
+        return;
     }
-    return false;
 }

@@ -17,7 +17,7 @@ public:
                int uart_rx, int uart_tx, int onewire_pin) override;
     bool isReady() override;
     bool read(SensorReading& r) override;
-    bool tick() override;
+    void tick(uint32_t nextReadMs) override;
 
     const char* type()    const override { return "pms7003"; }
     uint8_t     msgType() const override { return 240; }
@@ -27,7 +27,6 @@ private:
 
     State    _state       = State::IDLE;
     uint32_t _powerOnMs   = 0;
-    uint32_t _lastCycleMs = 0;
 
     // Ring buffer of last AVG_N valid frames
     static const uint8_t AVG_N = 10;
