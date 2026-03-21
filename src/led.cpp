@@ -6,6 +6,7 @@ static LedState  curState       = LED_OFF;
 static uint32_t  lastUpdate     = 0;
 static uint32_t  stateEnterTime = 0;
 static uint8_t   phase          = 0;
+static bool      mqttOkExpired  = false;  // true after 2-min yellow completes
 
 void ledInit(int8_t pin) {
     if (pin < 0) return;
@@ -16,6 +17,11 @@ void ledInit(int8_t pin) {
 }
 
 void ledSetState(LedState state) {
+    // WiFi lost — allow yellow to show again on next MQTT connect
+    if (state == LED_CONNECTING || state == LED_AP) mqttOkExpired = false;
+    // Suppress LED_MQTT_OK if 2-min window already completed this session
+    if (state == LED_MQTT_OK && mqttOkExpired) return;
+    if (state == curState) return;  // don't reset timer if already in this state
     curState       = state;
     lastUpdate     = 0;
     stateEnterTime = millis();
@@ -74,7 +80,9 @@ void ledUpdate() {
         case LED_MQTT_OK:
             // Yellow solid for 2 minutes, then off
             if (now - stateEnterTime > 120000UL) {
+                mqttOkExpired = true;
                 curState = LED_OFF;
+                setColor(0, 0, 0);
             } else {
                 setColor(12, 10, 0);
             }

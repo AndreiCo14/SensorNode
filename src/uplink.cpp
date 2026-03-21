@@ -19,6 +19,13 @@
 // ─── MQTT client (TLS or plain, selected at runtime) ─────────────────────────
 static espMqttClient*       mqttPlain  = nullptr;
 static espMqttClientSecure* mqttSecure = nullptr;
+// Deferred subscription: subscribe() is called from the main loop rather than
+// directly inside the CONNACK callback, where the library outbox state may not
+// be fully settled yet (causing spurious subscribe() failures).
+static bool s_needsSubscribe     = false;
+static bool s_publishStartSent   = false;
+static bool s_subscribeFailLogged = false;  // suppress log spam on repeated failures
+static char s_cmdTopic[64]       = {};
 #define MQTT_CALL(method, ...) \
     do { if (mqttSecure) mqttSecure->method(__VA_ARGS__); \
          else if (mqttPlain) mqttPlain->method(__VA_ARGS__); } while(0)
@@ -78,24 +85,28 @@ static void publishSensorData(const SensorReading* batch, uint8_t count) {
     if (!MQTT_CONNECTED() || count == 0) return;
 
     // Build JSON array: deviceId + time + sensor data fields only
-    String payload = "[";
-    for (uint8_t i = 0; i < count; i++) {
-        if (i > 0) payload += ',';
+    static char payload[2048];  // up to 10 entries × ~170 bytes each
+    size_t pos = 0;
+    payload[pos++] = '[';
+    for (uint8_t i = 0; i < count && pos < sizeof(payload) - 2; i++) {
+        if (i > 0 && pos < sizeof(payload) - 1) payload[pos++] = ',';
         char base[64];
-        snprintf(base, sizeof(base),
-                 "{\"deviceId\":%lu,\"time\":%lu,",
-                 (unsigned long)batch[i].deviceId,
-                 (unsigned long)batch[i].time);
-        payload += base;
+        int n = snprintf(base, sizeof(base),
+                         "{\"deviceId\":%lu,\"time\":%lu,",
+                         (unsigned long)batch[i].deviceId,
+                         (unsigned long)batch[i].time);
+        if (pos + n < sizeof(payload) - 1) { memcpy(payload + pos, base, n); pos += n; }
         const char* d = batch[i].data;
         if (d[0] == '{') d++;  // skip leading '{'; comma already present above
-        payload += d;
+        size_t dl = strlen(d);
+        if (pos + dl < sizeof(payload) - 1) { memcpy(payload + pos, d, dl); pos += dl; }
     }
-    payload += ']';
+    if (pos < sizeof(payload) - 1) payload[pos++] = ']';
+    payload[pos] = '\0';
 
     char topic[64];
     buildTopic(topic, sizeof(topic), TOPIC_DATA_SUFFIX);
-    MQTT_PUBLISH(topic, 0, false, payload.c_str());
+    MQTT_PUBLISH(topic, 0, false, payload);
     logMessage("Published " + String(count) + " readings -> " + topic, "info");
 
     if (mqttSecure || mqttPlain) ledSetState(LED_MQTT_OK);
@@ -128,12 +139,12 @@ void sendTelemetry() {
     doc["curInterval"] = teleInt;
     doc["seq"]         = readings;
 
-    String payload;
-    serializeJson(doc, payload);
+    static char payload[256];
+    serializeJson(doc, payload, sizeof(payload));
 
     char topic[64];
     buildTopic(topic, sizeof(topic), TOPIC_TELE_SUFFIX);
-    MQTT_PUBLISH(topic, 0, false, payload.c_str());
+    MQTT_PUBLISH(topic, 0, false, payload);
     logMessage(String("MQTT -> ") + topic, "info");
 
     STATE_SET(lastTeleSent, (int32_t)now);
@@ -160,12 +171,12 @@ static void publishStart() {
     }
 #endif
 
-    String payload;
-    serializeJson(doc, payload);
+    static char payload[256];
+    serializeJson(doc, payload, sizeof(payload));
 
     char topic[64];
     buildTopic(topic, sizeof(topic), TOPIC_START_SUFFIX);
-    MQTT_PUBLISH(topic, 0, false, payload.c_str());
+    MQTT_PUBLISH(topic, 0, false, payload);
     logMessage(String("MQTT -> ") + topic, "info");
     if (s_startupWindowMs == 0)
         s_startupWindowMs = millis();  // start the broker-response window
@@ -403,23 +414,20 @@ static void onMqttConnect(bool) {
     logMessage("MQTT connected (heap:" + String(FREE_HEAP()) + ")", "info");
     ledSetState(LED_MQTT_OK);
 
-    char cmdTopic[64];
-    snprintf(cmdTopic, sizeof(cmdTopic), "%s%lu%s",
+    snprintf(s_cmdTopic, sizeof(s_cmdTopic), "%s%lu%s",
              mqttCfgData.prefix,
              (unsigned long)STATE_GET(chipId),
              TOPIC_CMD_SUFFIX);
-    uint16_t subId = 0;
-    if (mqttSecure) subId = mqttSecure->subscribe(cmdTopic, 0);
-    else if (mqttPlain) subId = mqttPlain->subscribe(cmdTopic, 0);
-    if (subId) logMessage("Subscribed: " + String(cmdTopic), "info");
-    else {
-        logMessage("Subscribe FAILED (heap:" + String(FREE_HEAP()) + ")", "error");
-        publishStart();  // no subscription, publish immediately
-    }
+    s_needsSubscribe     = true;
+    s_publishStartSent   = false;
+    s_subscribeFailLogged = false;
 }
 
 static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
     STATE_SET(mqttConnected, false);
+    s_needsSubscribe     = false;
+    s_publishStartSent   = false;
+    s_subscribeFailLogged = false;
     ledSetState(LED_CONNECTING);
     logMessage(String("MQTT disconnected: ") + espMqttClientTypes::disconnectReasonToString(reason), "warn");
 }
@@ -478,7 +486,7 @@ static void initMqtt() {
         mqttPlain->onMessage(onMqttMessage);
         mqttPlain->setServer(mqttCfgData.broker, mqttCfgData.port);
         mqttPlain->setClientId(sysname);
-        mqttPlain->setKeepAlive(60);
+        mqttPlain->setKeepAlive(120);
         mqttPlain->setCleanSession(true);
         mqttPlain->connect();
     }
@@ -545,6 +553,28 @@ static bool wifiApWindow(const char* ssid1, const char* pass1,
     return false;
 }
 
+// ─── Deferred subscribe helper ────────────────────────────────────────────────
+
+static void tryDeferredSubscribe() {
+    if (!s_needsSubscribe || !MQTT_CONNECTED()) return;
+    uint16_t subId = 0;
+    if (mqttSecure) subId = mqttSecure->subscribe(s_cmdTopic, 0);
+    else if (mqttPlain) subId = mqttPlain->subscribe(s_cmdTopic, 0);
+    if (subId) {
+        logMessage("Subscribed: " + String(s_cmdTopic), "info");
+        s_needsSubscribe     = false;
+        s_subscribeFailLogged = false;
+    } else if (!s_subscribeFailLogged) {
+        s_subscribeFailLogged = true;
+        String msg = "Subscribe FAILED heap:" + String(FREE_HEAP());
+#ifdef ESP8266
+        msg += " maxBlock:" + String(ESP.getMaxFreeBlockSize());
+#endif
+        logMessage(msg, "error");
+    }
+    if (!s_publishStartSent) { publishStart(); s_publishStartSent = true; }
+}
+
 // ─── Uplink task ──────────────────────────────────────────────────────────────
 
 void uplinkTask(void* pvParameters) {
@@ -591,6 +621,8 @@ void uplinkTask(void* pvParameters) {
 
     for (;;) {
         MQTT_LOOP();
+
+        tryDeferredSubscribe();
 
         SensorReading reading;
         if (xQueueReceive(sensorQueue, &reading, 0) == pdTRUE) {
@@ -766,6 +798,8 @@ void uplinkProcess() {
     case US_CONNECTED:
         MQTT_LOOP();
         {
+            tryDeferredSubscribe();
+
             SensorReading reading;
             if (xQueueReceive(sensorQueue, &reading, 0) == pdTRUE) {
                 reading.time = getEpochTime();

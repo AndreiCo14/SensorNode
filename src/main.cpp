@@ -139,6 +139,7 @@ void setup() {
 
 #ifdef ESP8266
 void loop() {
+    ledUpdate();
     loggerProcess();
     webProcess();
     uplinkProcess();

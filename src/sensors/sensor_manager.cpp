@@ -192,7 +192,7 @@ static void doSensorRead() {
     merged[mlen]     = '}';
     merged[mlen + 1] = '\0';
 
-    if (!hasData) { ledUpdate(); return; }
+    if (!hasData) return;
 
     SensorReading combined = {};
     combined.deviceId = chipId;
@@ -206,8 +206,6 @@ static void doSensorRead() {
 
     if (xQueueSend(sensorQueue, &combined, pdMS_TO_TICKS(100)) != pdTRUE)
         logMessage("sensorQueue full — dropping reading", "warn");
-
-    ledUpdate();
 }
 
 static void tickAllSensors(uint32_t nextReadMs) {
@@ -217,6 +215,7 @@ static void tickAllSensors(uint32_t nextReadMs) {
 
 void sensorTask(void* pvParameters) {
     for (;;) {
+        ledUpdate();
         if (s_enabled) {
             uint32_t now = millis();
             uint16_t intervalM = STATE_GET(teleIntervalM);
@@ -226,7 +225,7 @@ void sensorTask(void* pvParameters) {
             if (now - s_lastRead >= intervalMs)
                 doSensorRead();
         }
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 

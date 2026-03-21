@@ -7,6 +7,7 @@
 #include "platform.h"
 #include "queues.h"
 #include "index_html.h"
+#include "favicon_ico.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
@@ -410,6 +411,13 @@ static void handleStaticFile(const String& path) {
 
     if (fullPath == "/index.html") {
         httpServer.send_P(200, "text/html", INDEX_HTML);
+        return;
+    }
+
+    if (fullPath == "/favicon.ico") {
+        httpServer.send_P(200, "image/x-icon",
+                          reinterpret_cast<const char*>(FAVICON_ICO),
+                          FAVICON_ICO_LEN);
         return;
     }
 
