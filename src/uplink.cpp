@@ -147,6 +147,18 @@ static void publishStart() {
     doc["time"]   = getEpochTime();
     doc["build"]  = FW_BUILD;
     doc["ip"]     = WiFi.localIP().toString();
+#ifdef ESP8266
+    doc["bootReason"]  = ESP.getResetReason();
+#else
+    {
+        static const char* const names[] = {
+            "Unknown","Poweron","Ext","SW","Panic",
+            "IntWDT","TaskWDT","WDT","Deepsleep","Brownout","SDIO"
+        };
+        int r = (int)STATE_GET(resetReason);
+        doc["bootReason"] = (r < 11) ? names[r] : "Unknown";
+    }
+#endif
 
     String payload;
     serializeJson(doc, payload);
@@ -162,7 +174,16 @@ static void publishStart() {
 // ─── OTA via HTTP/HTTPS ───────────────────────────────────────────────────────
 
 #ifdef ESP8266
+// Force HTTP on ESP8266 — BearSSL with constrained buffers while WebSocket is open
+// causes OOM crashes during SSL handshake on large binary downloads.
+static String forceHttp(const char* url) {
+    String s(url);
+    if (s.startsWith("https://")) s = "http://" + s.substring(8);
+    return s;
+}
+
 static int doHttpOta(const char* url) {
+    String httpUrl = forceHttp(url);
     ESPhttpUpdate.setLedPin(-1);
     ESPhttpUpdate.rebootOnUpdate(false);
     static int s_lastPct;
@@ -171,22 +192,13 @@ static int doHttpOta(const char* url) {
         int pct = (cur * 100) / total;
         if (pct >= s_lastPct + 10) { s_lastPct = pct; logMessage(String(pct), "otapct"); }
     });
-    bool isHttps = (strncmp(url, "https", 5) == 0);
     for (int attempt = 1; attempt <= 2; attempt++) {
-        logMessage(String("OTA: fetching ") + url + (attempt > 1 ? " (retry)" : ""), "info");
+        logMessage(String("OTA: fetching ") + httpUrl + (attempt > 1 ? " (retry)" : ""), "info");
         // Flush queued log messages before blocking on update
         while (uxQueueMessagesWaiting(logQueue)) loggerProcess();
         s_lastPct = -1;
-        HTTPUpdateResult res;
-        if (isHttps) {
-            BearSSL::WiFiClientSecure client;
-            client.setInsecure();
-            client.setBufferSizes(512, 512);
-            res = ESPhttpUpdate.update(client, url);
-        } else {
-            WiFiClient client;
-            res = ESPhttpUpdate.update(client, url);
-        }
+        WiFiClient client;
+        HTTPUpdateResult res = ESPhttpUpdate.update(client, httpUrl);
         if (res == HTTP_UPDATE_OK) {
             logMessage("OTA complete — rebooting", "info");
             while (uxQueueMessagesWaiting(logQueue)) loggerProcess();
@@ -263,16 +275,19 @@ static void doOtaCheck() {
         return;
     }
     logMessage("OTA check: " + String(OTA_VERSION_URL), "info");
-    OTA_FLUSH();  // send before blocking HTTPS request
+    OTA_FLUSH();  // send before blocking request
 
+#ifdef ESP8266
+    // Force HTTP on ESP8266 to avoid BearSSL OOM with open WebSocket
+    String versionUrl = forceHttp(OTA_VERSION_URL);
+    WiFiClient plainClient8266;
+    HTTPClient http;
+    http.begin(plainClient8266, versionUrl);
+#else
     bool isHttps = (strncmp(OTA_VERSION_URL, "https", 5) == 0);
     WiFiClientSecure secureClient;
     WiFiClient       plainClient;
     HTTPClient http;
-#ifdef ESP8266
-    if (isHttps) { secureClient.setInsecure(); secureClient.setBufferSizes(512, 512); http.begin(secureClient, OTA_VERSION_URL); }
-    else          { http.begin(plainClient, OTA_VERSION_URL); }
-#else
     if (isHttps) { secureClient.setInsecure(); http.begin(secureClient, OTA_VERSION_URL); }
     else          { http.begin(plainClient, OTA_VERSION_URL); }
 #endif
