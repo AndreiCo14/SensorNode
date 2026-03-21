@@ -17,23 +17,29 @@ bool storageInit() {
 
 #ifdef ESP8266
     bool ok = LittleFS.begin();
-#else
-    bool ok = LittleFS.begin(true, "/littlefs", 10, "storage");
-#endif
     if (!ok) {
-        logMessage("LittleFS mount failed — attempting format", "warn");
-#ifdef ESP8266
+        logMessage("LittleFS mount failed — formatting", "warn");
         LittleFS.format();
         ok = LittleFS.begin();
+    }
 #else
-        LittleFS.format();
-        ok = LittleFS.begin(true, "/littlefs", 10, "storage");
+    // Try known partition labels in order: our preferred label first,
+    // then fallbacks for common third-party firmware layouts (ESPEasy etc.)
+    // LittleFS.begin(formatOnFail=true) will reformat if the partition exists
+    // but contains a foreign filesystem — wiping old data, which is fine on migration.
+    static const char* const labels[] = {"storage", "spiffs", "littlefs", "ffat", nullptr};
+    bool ok = false;
+    const char* usedLabel = nullptr;
+    for (int i = 0; labels[i] && !ok; i++) {
+        ok = LittleFS.begin(true, "/littlefs", 10, labels[i]);
+        if (ok) usedLabel = labels[i];
+    }
+    if (ok && usedLabel && strcmp(usedLabel, "storage") != 0)
+        logMessage(String("LittleFS mounted on partition '") + usedLabel + "' (migrated)", "warn");
 #endif
-        if (!ok) {
-            logMessage("LittleFS unavailable — check partition table", "error");
-            return false;
-        }
-        logMessage("LittleFS formatted and mounted (fresh filesystem)", "warn");
+    if (!ok) {
+        logMessage("LittleFS unavailable — no compatible partition found", "error");
+        return false;
     }
 
     File root = LittleFS.open("/", "r");
