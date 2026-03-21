@@ -375,7 +375,7 @@ static void handleGetFs() {
 static void handleI2cScan() {
     JsonDocument doc;
     JsonArray arr = doc["devices"].to<JsonArray>();
-    for (uint8_t addr = 1; addr < 127; addr++) {
+    for (uint8_t addr = 1; addr <= 127; addr++) {
         Wire.beginTransmission(addr);
         if (Wire.endTransmission() == 0) {
             JsonObject obj = arr.add<JsonObject>();
