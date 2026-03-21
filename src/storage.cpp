@@ -5,6 +5,7 @@
 #include "logger.h"
 #include <LittleFS.h>
 #include "esp_littlefs.h"
+#include "esp_partition.h"
 #include <ArduinoJson.h>
 
 JsonDocument sensorSetupData;
@@ -27,22 +28,40 @@ bool storageInit() {
     // Try known partition labels in order: our preferred label first,
     // then fallbacks for common third-party firmware layouts (ESPEasy etc.)
     //
-    // After a failed begin(), _started stays false so LittleFS.end() is a
-    // no-op — the VFS stays partially registered in ESP-IDF. Call
-    // esp_vfs_littlefs_unregister() directly before each attempt to guarantee
-    // a clean slate. Then use begin(formatOnFail=true) for mount+format in one
-    // shot; formatOnFail calls disableCore0WDT() which may log a warning when
-    // called from setup() but the return value is ignored — format proceeds.
+    // After a failed begin(), esp_vfs_littlefs_unregister() clears stale VFS
+    // state (LittleFS.end() is a no-op when _started=false).
+    //
+    // If a partition exists but contains foreign/corrupt data (e.g. SPIFFS),
+    // LittleFS.format() fails because lfs_format() can't overwrite SPIFFS
+    // superblocks while the WDT disable is broken in early setup().
+    // Fix: erase just the first two 4KB sectors (LittleFS superblocks 0+1)
+    // directly via esp_partition_erase_range(), then begin(formatOnFail=true)
+    // succeeds on blank flash without needing WDT manipulation.
     static const char* const labels[] = {"storage", "spiffs", "littlefs", "ffat", nullptr};
     bool ok = false;
     const char* usedLabel = nullptr;
     for (int i = 0; labels[i] && !ok; i++) {
-        esp_vfs_littlefs_unregister(labels[i]); // force-clear any stale VFS registration
+        esp_vfs_littlefs_unregister(labels[i]);
+        ok = LittleFS.begin(false, "/littlefs", 10, labels[i]);
+        if (ok) { usedLabel = labels[i]; break; }
+
+        // Partition found but mount failed — check it actually exists first
+        const esp_partition_t* p = esp_partition_find_first(
+            ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, labels[i]);
+        if (!p) continue;
+
+        // Erase superblock sectors so lfs_format() gets clean flash
+        logMessage(String("Erasing '") + labels[i] + "' superblocks for reformat", "warn");
+        esp_partition_erase_range(p, 0, 0x2000); // blocks 0+1 = 8KB
+        esp_vfs_littlefs_unregister(labels[i]);
         ok = LittleFS.begin(true, "/littlefs", 10, labels[i]);
-        if (ok) usedLabel = labels[i];
+        if (ok) {
+            usedLabel = labels[i];
+            logMessage(String("LittleFS reformatted '") + labels[i] + "' (migration)", "warn");
+        }
     }
     if (ok && usedLabel && strcmp(usedLabel, "storage") != 0)
-        logMessage(String("LittleFS mounted on partition '") + usedLabel + "' (migrated)", "warn");
+        logMessage(String("LittleFS mounted on partition '") + usedLabel + "'", "warn");
 #endif
     if (!ok) {
         logMessage("LittleFS unavailable — no compatible partition found", "error");
