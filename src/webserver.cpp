@@ -9,6 +9,7 @@
 #include "index_html.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include <Wire.h>
 #include <time.h>
 
 static WebServerT httpServer(80);
@@ -67,6 +68,7 @@ static void handleGetState() {
     time_t epoch = time(NULL);
     doc["epochTime"]  = (uint32_t)epoch;
     doc["ntpSynced"]  = (epoch > 1000000000UL);
+    doc["lfsReady"]   = lfsReady;
 
     sendJsonDoc(200, doc);
 }
@@ -100,7 +102,8 @@ static void handlePostWifi() {
     const char* ssid2 = doc["ssid2"] | "";
     const char* pass2 = doc["pass2"] | "";
     if (strlen(ssid) == 0) { sendJson(400, "{\"error\":\"ssid required\"}"); return; }
-    saveWifiCreds(ssid, pass, ssid2, pass2);
+    if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
+    if (!saveWifiCreds(ssid, pass, ssid2, pass2)) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
     logMessage(String("WiFi saved: ") + ssid, "info");
     sendJson(200, "{\"ok\":true,\"msg\":\"Saved. Rebooting...\"}");
     rebootPending = true;
@@ -132,10 +135,11 @@ static void handleGetMqttConfig() {
     MqttConfig cfg;
     loadMqttConfig(cfg);
     JsonDocument doc;
-    doc["broker"] = cfg.broker;
-    doc["port"]   = cfg.port;
-    doc["prefix"] = cfg.prefix;
-    doc["tls"]    = cfg.tls;
+    doc["broker"]          = cfg.broker;
+    doc["port"]            = cfg.port;
+    doc["prefix"]          = cfg.prefix;
+    doc["tls"]             = cfg.tls;
+    doc["reconnIntervalS"] = cfg.reconnIntervalS;
     sendJsonDoc(200, doc);
 }
 
@@ -149,13 +153,15 @@ static void handlePostMqttConfig() {
     }
     MqttConfig cfg;
     strncpy(cfg.broker, doc["broker"] | DEFAULT_MQTT_BROKER, sizeof(cfg.broker) - 1);
-    cfg.port = doc["port"] | DEFAULT_MQTT_PORT;
+    cfg.port            = doc["port"]            | DEFAULT_MQTT_PORT;
     strncpy(cfg.prefix, doc["prefix"] | DEFAULT_MQTT_PREFIX, sizeof(cfg.prefix) - 1);
-    cfg.tls  = doc["tls"]  | DEFAULT_MQTT_TLS;
+    cfg.tls             = doc["tls"]             | DEFAULT_MQTT_TLS;
+    cfg.reconnIntervalS = doc["reconnIntervalS"] | (uint16_t)5;
     cfg.broker[sizeof(cfg.broker)-1] = '\0';
     cfg.prefix[sizeof(cfg.prefix)-1] = '\0';
     if (strlen(cfg.broker) == 0) { sendJson(400, "{\"error\":\"broker required\"}"); return; }
-    saveMqttConfig(cfg);
+    if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
+    if (!saveMqttConfig(cfg)) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
     logMessage("MQTT config saved", "info");
     sendJson(200, "{\"ok\":true,\"msg\":\"Saved. Rebooting...\"}");
     rebootPending = true;
@@ -173,6 +179,7 @@ static void handleGetHwConfig() {
     doc["uart_tx"]       = cfg.uart_tx;
     doc["onewire"]       = cfg.onewire;
     doc["led_pin"]       = cfg.led_pin;
+    doc["5v_pin"]        = cfg.pin5v;
     doc["interval"]      = cfg.intervalSec;
     doc["teleIntervalM"] = cfg.teleIntervalM;
     doc["sampleNum"]     = cfg.sampleNum;
@@ -196,11 +203,13 @@ static void handlePostHwConfig() {
     if (!doc["uart_tx"].isNull())       cfg.uart_tx       = doc["uart_tx"].as<int8_t>();
     if (!doc["onewire"].isNull())       cfg.onewire       = doc["onewire"].as<int8_t>();
     if (!doc["led_pin"].isNull())       cfg.led_pin       = doc["led_pin"].as<int8_t>();
+    if (!doc["5v_pin"].isNull())        cfg.pin5v         = doc["5v_pin"].as<int8_t>();
     if (!doc["interval"].isNull())      cfg.intervalSec   = doc["interval"].as<uint16_t>();
     if (!doc["teleIntervalM"].isNull()) cfg.teleIntervalM = doc["teleIntervalM"].as<uint16_t>();
     if (!doc["sampleNum"].isNull())     cfg.sampleNum     = doc["sampleNum"].as<int8_t>();
     if (!doc["onTime"].isNull())        cfg.onTime        = doc["onTime"].as<uint16_t>();
-    saveHwConfig(cfg);
+    if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
+    if (!saveHwConfig(cfg)) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
     logMessage("HW config saved", "info");
     sendJson(200, "{\"ok\":true,\"msg\":\"Saved. Rebooting...\"}");
     rebootPending = true;
@@ -239,6 +248,7 @@ static void handleGetConfigExport() {
     doc["hw"]["uart_tx"]       = hw.uart_tx;
     doc["hw"]["onewire"]       = hw.onewire;
     doc["hw"]["led_pin"]       = hw.led_pin;
+    doc["hw"]["5v_pin"]        = hw.pin5v;
     doc["hw"]["interval"]      = hw.intervalSec;
     doc["hw"]["teleIntervalM"] = hw.teleIntervalM;
     doc["hw"]["sampleNum"]     = hw.sampleNum;
@@ -259,11 +269,12 @@ static void handleGetConfigExport() {
 
 static void handlePostSensorSetup() {
     if (!httpServer.hasArg("plain")) { sendJson(400, "{\"error\":\"no body\"}"); return; }
+    if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
     if (xSemaphoreTake(sensorSetupMutex, pdMS_TO_TICKS(1000))) {
         DeserializationError err = deserializeJson(sensorSetupData, httpServer.arg("plain"));
         xSemaphoreGive(sensorSetupMutex);
         if (err) { sendJson(400, "{\"error\":\"invalid JSON\"}"); return; }
-        saveSensorSetup();
+        if (!saveSensorSetup()) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
         sendJson(200, "{\"ok\":true}");
         logMessage("Sensor setup updated via web", "info");
     } else {
@@ -285,16 +296,24 @@ static void handlePostCmd() {
 
 // ─── POST /api/ota ────────────────────────────────────────────────────────────
 
+static bool otaBeginOk = false;
+
 static void handleOtaUpload() {
     HTTPUpload& upload = httpServer.upload();
     if (upload.status == UPLOAD_FILE_START) {
-        logMessage("OTA upload: " + upload.filename, "info");
-        if (!OTA_BEGIN(upload.contentLength))
-            logMessage("OTA begin failed: " + String(OTA_ERROR_STRING()), "error");
+        otaBeginOk = OTA_BEGIN(upload.contentLength);
+        if (otaBeginOk) {
+            logMessage("OTA upload: " + upload.filename, "info");
+        } else {
+            logMessage("OTA begin failed: " + String(OTA_ERROR_STRING()) +
+                       " — partition table mismatch? Reflash via serial.", "error");
+        }
     } else if (upload.status == UPLOAD_FILE_WRITE) {
+        if (!otaBeginOk) return;
         if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
-            logMessage("OTA write error", "error");
+            logMessage("OTA write error: " + String(OTA_ERROR_STRING()), "error");
     } else if (upload.status == UPLOAD_FILE_END) {
+        if (!otaBeginOk) return;
         if (Update.end(true))
             logMessage("OTA upload complete: " + String(upload.totalSize) + " bytes", "info");
         else
@@ -303,7 +322,7 @@ static void handleOtaUpload() {
 }
 
 static void handleOtaResponse() {
-    if (Update.hasError())
+    if (!otaBeginOk || Update.hasError())
         sendJson(500, String("{\"ok\":false,\"error\":\"") + OTA_ERROR_STRING() + "\"}");
     else {
         sendJson(200, "{\"ok\":true,\"msg\":\"Rebooting...\"}");
@@ -347,6 +366,24 @@ static void handleGetFs() {
             entry = root.openNextFile();
         }
         root.close();
+    }
+    sendJsonDoc(200, doc);
+}
+
+// ─── GET /api/utils/i2c-scan ─────────────────────────────────────────────────
+
+static void handleI2cScan() {
+    JsonDocument doc;
+    JsonArray arr = doc["devices"].to<JsonArray>();
+    for (uint8_t addr = 1; addr < 127; addr++) {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0) {
+            JsonObject obj = arr.add<JsonObject>();
+            char buf[7];
+            snprintf(buf, sizeof(buf), "0x%02X", addr);
+            obj["addr"] = addr;
+            obj["hex"]  = buf;
+        }
     }
     sendJsonDoc(200, doc);
 }
@@ -401,6 +438,9 @@ static void webServerSetup() {
     httpServer.on("/api/wifi",       HTTP_GET,  handleGetWifi);
     httpServer.on("/api/wifi",       HTTP_POST, handlePostWifi);
     httpServer.on("/api/wifi/scan",  HTTP_GET,  handleGetWifiScan);
+
+    // Utils
+    httpServer.on("/api/utils/i2c-scan", HTTP_GET, handleI2cScan);
 
     // MQTT config
     httpServer.on("/api/mqtt/config", HTTP_GET,  handleGetMqttConfig);

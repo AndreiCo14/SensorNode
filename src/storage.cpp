@@ -21,8 +21,19 @@ bool storageInit() {
     bool ok = LittleFS.begin(true, "/littlefs", 10, "storage");
 #endif
     if (!ok) {
-        logMessage("LittleFS mount failed", "error");
-        return false;
+        logMessage("LittleFS mount failed — attempting format", "warn");
+#ifdef ESP8266
+        LittleFS.format();
+        ok = LittleFS.begin();
+#else
+        LittleFS.format();
+        ok = LittleFS.begin(true, "/littlefs", 10, "storage");
+#endif
+        if (!ok) {
+            logMessage("LittleFS unavailable — check partition table", "error");
+            return false;
+        }
+        logMessage("LittleFS formatted and mounted (fresh filesystem)", "warn");
     }
 
     File root = LittleFS.open("/", "r");
@@ -91,15 +102,17 @@ bool loadMqttConfig(MqttConfig& cfg) {
     if (!readJson(MQTT_CONF_PATH, doc)) {
         // Return defaults
         strncpy(cfg.broker, DEFAULT_MQTT_BROKER, sizeof(cfg.broker) - 1);
-        cfg.port = DEFAULT_MQTT_PORT;
+        cfg.port            = DEFAULT_MQTT_PORT;
         strncpy(cfg.prefix, DEFAULT_MQTT_PREFIX, sizeof(cfg.prefix) - 1);
-        cfg.tls  = DEFAULT_MQTT_TLS;
+        cfg.tls             = DEFAULT_MQTT_TLS;
+        cfg.reconnIntervalS = 5;
         return false;
     }
     strncpy(cfg.broker, doc["broker"] | DEFAULT_MQTT_BROKER, sizeof(cfg.broker) - 1);
     cfg.port = doc["port"] | DEFAULT_MQTT_PORT;
     strncpy(cfg.prefix, doc["prefix"] | DEFAULT_MQTT_PREFIX, sizeof(cfg.prefix) - 1);
-    cfg.tls  = doc["tls"]  | DEFAULT_MQTT_TLS;
+    cfg.tls             = doc["tls"]             | DEFAULT_MQTT_TLS;
+    cfg.reconnIntervalS = doc["reconnIntervalS"] | (uint16_t)5;
     cfg.broker[sizeof(cfg.broker)-1] = '\0';
     cfg.prefix[sizeof(cfg.prefix)-1] = '\0';
     return true;
@@ -107,10 +120,11 @@ bool loadMqttConfig(MqttConfig& cfg) {
 
 bool saveMqttConfig(const MqttConfig& cfg) {
     JsonDocument doc;
-    doc["broker"] = cfg.broker;
-    doc["port"]   = cfg.port;
-    doc["prefix"] = cfg.prefix;
-    doc["tls"]    = cfg.tls;
+    doc["broker"]         = cfg.broker;
+    doc["port"]           = cfg.port;
+    doc["prefix"]         = cfg.prefix;
+    doc["tls"]            = cfg.tls;
+    doc["reconnIntervalS"] = cfg.reconnIntervalS;
     return writeJson(MQTT_CONF_PATH, doc);
 }
 
@@ -124,6 +138,7 @@ bool loadHwConfig(HwConfig& cfg) {
     cfg.uart_tx      = DEFAULT_UART_TX;
     cfg.onewire      = DEFAULT_ONEWIRE;
     cfg.led_pin      = DEFAULT_LED_PIN;
+    cfg.pin5v        = DEFAULT_5V_PIN;
     cfg.intervalSec  = 60;
     cfg.teleIntervalM = DEFAULT_TELE_INTERVAL_M;
     cfg.sampleNum    = DEFAULT_SAMPLE_NUM;
@@ -138,6 +153,7 @@ bool loadHwConfig(HwConfig& cfg) {
     if (!doc["uart_tx"].isNull())       cfg.uart_tx      = doc["uart_tx"].as<int8_t>();
     if (!doc["onewire"].isNull())       cfg.onewire      = doc["onewire"].as<int8_t>();
     if (!doc["led_pin"].isNull())       cfg.led_pin      = doc["led_pin"].as<int8_t>();
+    if (!doc["5v_pin"].isNull())        cfg.pin5v        = doc["5v_pin"].as<int8_t>();
     if (!doc["interval"].isNull())      cfg.intervalSec  = doc["interval"].as<uint16_t>();
     if (!doc["teleIntervalM"].isNull()) cfg.teleIntervalM = doc["teleIntervalM"].as<uint16_t>();
     if (!doc["sampleNum"].isNull())     cfg.sampleNum    = doc["sampleNum"].as<int8_t>();
@@ -156,6 +172,7 @@ bool saveHwConfig(const HwConfig& cfg) {
     doc["uart_tx"]       = cfg.uart_tx;
     doc["onewire"]       = cfg.onewire;
     doc["led_pin"]       = cfg.led_pin;
+    doc["5v_pin"]        = cfg.pin5v;
     doc["interval"]      = cfg.intervalSec;
     doc["teleIntervalM"] = cfg.teleIntervalM;
     doc["sampleNum"]     = cfg.sampleNum;
