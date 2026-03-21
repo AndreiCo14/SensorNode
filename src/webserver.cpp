@@ -69,6 +69,13 @@ static void handleGetState() {
     doc["epochTime"]  = (uint32_t)epoch;
     doc["ntpSynced"]  = (epoch > 1000000000UL);
     doc["lfsReady"]   = lfsReady;
+#ifdef ESP8266
+    doc["mcu"]        = "ESP8266";
+#else
+    doc["mcu"]        = ESP.getChipModel();
+#endif
+    doc["flashKB"]    = ESP.getFlashChipSize() / 1024;
+    doc["ipAddress"]  = apMode ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
 
     sendJsonDoc(200, doc);
 }

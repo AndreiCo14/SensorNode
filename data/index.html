@@ -78,6 +78,9 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
     <h2>Status</h2>
     <div class="stat-grid">
       <div class="stat"><div class="label">Chip ID</div><div class="value" id="s-chip">—</div></div>
+      <div class="stat"><div class="label">MCU</div><div class="value" id="s-mcu">—</div></div>
+      <div class="stat"><div class="label">Flash</div><div class="value" id="s-flash">—</div></div>
+      <div class="stat"><div class="label">IP</div><div class="value" id="s-ip">—</div></div>
       <div class="stat"><div class="label">WiFi</div><div class="value" id="s-wifi">—</div></div>
       <div class="stat"><div class="label">MQTT</div><div class="value" id="s-mqtt">—</div></div>
       <div class="stat"><div class="label">RSSI</div><div class="value" id="s-rssi">—</div></div>
@@ -184,6 +187,14 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
     <div class="msg" id="ota-msg"></div>
   </section>
 
+  <!-- Utils -->
+  <section id="utils-section" class="draggable-section" draggable="true">
+    <h2>Utils</h2>
+    <div style="font-size:10px;color:#666;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">I2C Scanner</div>
+    <button class="btn" onclick="runI2cScan()">Scan I2C Bus</button>
+    <div id="i2c-result" style="margin-top:8px;font-size:12px;min-height:20px"></div>
+  </section>
+
   <!-- Log Stream -->
   <section id="log-section" class="full">
     <h2>Log Stream</h2>
@@ -201,6 +212,9 @@ function loadState() {
     .then(function(r){return r.json()})
     .then(function(d){
       set('s-chip',   d.chipId);
+      set('s-mcu',    d.mcu || '—');
+      set('s-flash',  d.flashKB ? (d.flashKB >= 1024 ? (d.flashKB/1024) + ' MB' : d.flashKB + ' KB') : '—');
+      set('s-ip',     d.ipAddress || '—');
       set('s-wifi',   d.apMode ? '<span class="warn">&#9679; AP mode</span>'
                                : (d.wifiConnected ? '<span class="ok">&#9679; connected</span>'
                                                   : '<span class="err">&#9679; offline</span>'));
@@ -325,13 +339,14 @@ function saveHwConfig() {
 // ── Sensor Setup ───────────────────────────────────────────────────────────────
 var SENSOR_TYPES = [
   {type:'bme280',  label:'BME280',       fields:[{key:'addr',label:'I2C addr',def:0x76}]},
-  {type:'bmp280',  label:'BMP280',       fields:[{key:'addr',label:'I2C addr',def:0x76}]},
+  {type:'bmp280',  label:'BMP280',       hidden:true, fields:[{key:'addr',label:'I2C addr',def:0x76}]},
   {type:'bmp580',  label:'BMP581',       fields:[{key:'addr',label:'I2C addr',def:0x46}]},
   {type:'sht30',   label:'SHT30/SHT31',  fields:[{key:'addr',label:'I2C addr',def:0x44}]},
   {type:'sht4x',   label:'SHT40/SHT41', fields:[{key:'addr',label:'I2C addr',def:0x44}]},
   {type:'htu21d',  label:'HTU21D',       fixedAddr:0x40, fields:[]},
   {type:'scd4x',   label:'SCD40/SCD41',  fixedAddr:0x62, fields:[]},
   {type:'sgp4x',   label:'SGP40/SGP41',  fixedAddr:0x59, fields:[]},
+  {type:'xdb401',  label:'XDB401',       fields:[{key:'addr',label:'I2C addr',def:0x7F},{key:'fullscale_pa',label:'Full scale (MPa)',def:500000,fmt:'num',div:1e6}]},
   {type:'ds18b20', label:'DS18B20',      fields:[]},
   {type:'pms7003', label:'PMS7003',      fields:[]},
 ];
@@ -342,6 +357,7 @@ function renderSensorCards(data) {
   var container = document.getElementById('sensor-cards');
   container.innerHTML = '';
   SENSOR_TYPES.forEach(function(st) {
+    if (st.hidden) return;
     var entry = data.find(function(e){return e.type===st.type}) || {type:st.type,enabled:false};
     var card = document.createElement('div');
     card.className = 'sensor-card';
@@ -354,10 +370,16 @@ function renderSensorCards(data) {
     }
     st.fields.forEach(function(f){
       var val = entry[f.key] !== undefined ? entry[f.key] : f.def;
-      var hexVal = '0x' + val.toString(16);
-      fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
-        +'<input type="text" data-type="'+st.type+'" data-key="'+f.key+'" value="'+hexVal+'" style="width:52px" oninput="updateHexSpan(this)">'
-        +'<span style="color:#555;font-size:10px">('+val+')</span></div>';
+      if (f.fmt === 'num') {
+        var dispVal = f.div ? val / f.div : val;
+        fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
+          +'<input type="number" data-type="'+st.type+'" data-key="'+f.key+'" data-fmt="num"'+(f.div?' data-div="'+f.div+'"':'')+' value="'+dispVal+'" step="any" style="width:64px"></div>';
+      } else {
+        var hexVal = '0x' + val.toString(16);
+        fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
+          +'<input type="text" data-type="'+st.type+'" data-key="'+f.key+'" value="'+hexVal+'" style="width:52px" oninput="updateHexSpan(this)">'
+          +'<span style="color:#555;font-size:10px">('+val+')</span></div>';
+      }
     });
     fieldsHtml += '</div>';
     card.innerHTML = headHtml + fieldsHtml;
@@ -375,11 +397,17 @@ function loadSensorSetup() {
 function saveSensorSetup() {
   var result = [];
   SENSOR_TYPES.forEach(function(st) {
+    if (st.hidden) {
+      // preserve existing saved state, don't overwrite with UI defaults
+      var existing = sensorSetupData.find(function(e){return e.type===st.type});
+      if (existing) result.push(existing);
+      return;
+    }
     var cb  = document.querySelector('input[type=checkbox][data-type="'+st.type+'"]');
     var obj = {type: st.type, enabled: cb ? cb.checked : false};
     st.fields.forEach(function(f){
       var inp = document.querySelector('input[data-type="'+st.type+'"][data-key="'+f.key+'"]');
-      if (inp) obj[f.key] = parseInt(inp.value);
+      if (inp) obj[f.key] = f.fmt === 'num' ? parseFloat(inp.value) * (f.div || 1) : parseInt(inp.value);
     });
     result.push(obj);
   });
@@ -454,6 +482,26 @@ function doOta() {
   xhr.onerror = function(){ showMsg('ota-msg','Upload failed',false); prog.style.display='none'; };
   xhr.open('POST','/api/ota');
   xhr.send(fd);
+}
+
+// ── Utils ──────────────────────────────────────────────────────────────────────
+function runI2cScan() {
+  var el = document.getElementById('i2c-result');
+  el.innerHTML = '<span style="color:#666">Scanning...</span>';
+  fetch('/api/utils/i2c-scan')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      var devs = d.devices || [];
+      if (!devs.length) {
+        el.innerHTML = '<span class="warn">No devices found</span>';
+        return;
+      }
+      el.innerHTML = devs.map(function(x){
+        return '<span style="background:#1a2a1a;border:1px solid #2a3a2a;border-radius:2px;padding:2px 7px;margin-right:4px;color:#4caf50">'
+          + x.hex + '</span>';
+      }).join('');
+    })
+    .catch(function(){el.innerHTML='<span class="err">Scan failed</span>';});
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
