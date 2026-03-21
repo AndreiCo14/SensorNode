@@ -487,7 +487,7 @@ static bool wifiApWindow(const char* ssid1, const char* pass1,
     STATE_SET(wifiConnected, true);
 
     logMessage(String("AP: ") + g_apSsid + " @ 192.168.4.1 (3 min)", "warn");
-    ledSetState(LED_CONNECTING);
+    ledSetState(hasSta ? LED_CONNECTING : LED_AP);
 
     if (hasPrimary) {
         WiFi.setHostname(g_apSsid);
@@ -547,6 +547,7 @@ void uplinkTask(void* pvParameters) {
 
     if (!staConnected) {
         logMessage("No STA — AP remains up", "warn");
+        ledSetState(LED_AP);
         for (;;) {
             dnsServer.processNextRequest();
             MqttCommand cmd;
@@ -632,9 +633,15 @@ void uplinkTask(void* pvParameters) {
             STATE_SET(wifiConnected, true);
         }
 
+        static uint32_t s_lastMqttAttempt = 0;
         if (!MQTT_CONNECTED() && WiFi.status() == WL_CONNECTED) {
-            logMessage("MQTT reconnecting...", "warn");
-            MQTT_CONNECT();
+            uint32_t now32 = millis();
+            uint32_t intervalMs = (uint32_t)mqttCfgData.reconnIntervalS * 1000;
+            if (now32 - s_lastMqttAttempt >= intervalMs) {
+                s_lastMqttAttempt = now32;
+                logMessage("MQTT reconnecting...", "warn");
+                MQTT_CONNECT();
+            }
         }
 
         STATE_SET(mqttConnected, MQTT_CONNECTED());
@@ -675,7 +682,7 @@ void uplinkInit() {
     s_apWindowStart  = millis();
     s_triedSecondary = !hasSecondary || !hasPrimary;
     s_uplinkState    = US_AP_WINDOW;
-    ledSetState(LED_CONNECTING);
+    ledSetState(hasSta ? LED_CONNECTING : LED_AP);
     logMessage(String("AP: ") + g_apSsid + " @ 192.168.4.1 (" +
                String(AP_WINDOW_MS / 1000) + "s window)", "warn");
 }
@@ -712,6 +719,7 @@ void uplinkProcess() {
         }
         if (millis() - s_apWindowStart > AP_WINDOW_MS) {
             logMessage("AP window expired — no STA", "warn");
+            ledSetState(LED_AP);
             s_uplinkState = US_AP_ONLY;
         }
         break;

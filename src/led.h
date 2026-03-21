@@ -1,17 +1,15 @@
 #pragma once
 #include <stdint.h>
 
-// LED states
 enum LedState {
     LED_OFF = 0,
-    LED_BOOT,        // blue slow pulse
-    LED_CONNECTING,  // cyan fast pulse
-    LED_CONNECTED,   // green solid
-    LED_MQTT_OK,     // green brief flash
-    LED_ERROR,       // red solid
+    LED_AP,          // purple solid      — no WiFi creds, config mode
+    LED_CONNECTING,  // blue pulse        — has creds, connecting to WiFi
+    LED_CONNECTED,   // green pulse       — WiFi up, MQTT not connected
+    LED_MQTT_OK,     // yellow solid 2min — WiFi + MQTT connected, then off
+    LED_ERROR,       // red solid         — error
 };
 
-// Must be called after ledInit() with a valid pin
 void ledInit(int8_t pin);
 void ledSetState(LedState state);
 void ledUpdate();   // call periodically from task loop

@@ -94,8 +94,8 @@ void setup() {
     {
         HwConfig hw;
         loadHwConfig(hw);
+        if (hw.pin5v >= 0) { pinMode(hw.pin5v, OUTPUT); digitalWrite(hw.pin5v, HIGH); }
         ledInit(hw.led_pin);
-        ledSetState(LED_BOOT);
         // Override RAM defaults with persisted values
         STATE_LOCK();
         sysState.teleIntervalM = hw.teleIntervalM;
