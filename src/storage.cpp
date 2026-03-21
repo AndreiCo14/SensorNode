@@ -4,6 +4,7 @@
 #include "board.h"
 #include "logger.h"
 #include <LittleFS.h>
+#include "esp_littlefs.h"
 #include <ArduinoJson.h>
 
 JsonDocument sensorSetupData;
@@ -25,12 +26,18 @@ bool storageInit() {
 #else
     // Try known partition labels in order: our preferred label first,
     // then fallbacks for common third-party firmware layouts (ESPEasy etc.)
-    // LittleFS.begin(formatOnFail=true) will reformat if the partition exists
-    // but contains a foreign filesystem — wiping old data, which is fine on migration.
+    //
+    // After a failed begin(), _started stays false so LittleFS.end() is a
+    // no-op — the VFS stays partially registered in ESP-IDF. Call
+    // esp_vfs_littlefs_unregister() directly before each attempt to guarantee
+    // a clean slate. Then use begin(formatOnFail=true) for mount+format in one
+    // shot; formatOnFail calls disableCore0WDT() which may log a warning when
+    // called from setup() but the return value is ignored — format proceeds.
     static const char* const labels[] = {"storage", "spiffs", "littlefs", "ffat", nullptr};
     bool ok = false;
     const char* usedLabel = nullptr;
     for (int i = 0; labels[i] && !ok; i++) {
+        esp_vfs_littlefs_unregister(labels[i]); // force-clear any stale VFS registration
         ok = LittleFS.begin(true, "/littlefs", 10, labels[i]);
         if (ok) usedLabel = labels[i];
     }
