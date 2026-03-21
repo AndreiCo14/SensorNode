@@ -4,8 +4,10 @@
 #include "board.h"
 #include "logger.h"
 #include <LittleFS.h>
-#include "esp_littlefs.h"
-#include "esp_partition.h"
+#ifndef ESP8266
+#  include "esp_littlefs.h"
+#  include "esp_partition.h"
+#endif
 #include <ArduinoJson.h>
 
 JsonDocument sensorSetupData;
