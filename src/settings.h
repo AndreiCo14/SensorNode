@@ -19,7 +19,7 @@
 #  define DEFAULT_MQTT_PREFIX   "Sensors/"
 #endif
 #ifndef DEFAULT_MQTT_TLS
-#  define DEFAULT_MQTT_TLS      true
+#  define DEFAULT_MQTT_TLS      false
 #endif
 
 // MQTT topic suffixes

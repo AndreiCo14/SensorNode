@@ -15,6 +15,7 @@ struct MqttConfig {
     uint16_t port;
     char    prefix[32];
     bool    tls;
+    uint16_t reconnIntervalS;   // seconds between reconnect attempts (default 5)
 };
 
 struct HwConfig {
@@ -24,6 +25,7 @@ struct HwConfig {
     int8_t   uart_tx;
     int8_t   onewire;
     int8_t   led_pin;
+    int8_t   pin5v;
     uint16_t intervalSec;
     // Operational params — persisted so they survive reboots
     uint16_t teleIntervalM;

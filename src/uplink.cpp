@@ -675,6 +675,19 @@ void uplinkInit() {
     loadWifiCreds(s_ssid, sizeof(s_ssid), s_pass, sizeof(s_pass),
                   s_ssid2, sizeof(s_ssid2), s_pass2, sizeof(s_pass2));
 
+    // If no saved creds (e.g. ESPEasy used SPIFFS which got erased on first
+    // LittleFS mount), fall back to SDK-cached credentials — ESP8266 SDK stores
+    // the last-used AP in reserved flash sectors that survive OTA and FS reformats.
+    if (strlen(s_ssid) == 0) {
+        String sdkSsid = WiFi.SSID();
+        if (sdkSsid.length() > 0) {
+            strncpy(s_ssid, sdkSsid.c_str(), sizeof(s_ssid) - 1);
+            strncpy(s_pass, WiFi.psk().c_str(), sizeof(s_pass) - 1);
+            logMessage("No saved WiFi — SDK cache: " + sdkSsid, "warn");
+            if (lfsReady) saveWifiCreds(s_ssid, s_pass, s_ssid2, s_pass2);
+        }
+    }
+
     bool hasPrimary   = (strlen(s_ssid) > 0);
     bool hasSecondary = (strlen(s_ssid2) > 0);
     bool hasSta       = hasPrimary || hasSecondary;

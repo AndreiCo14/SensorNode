@@ -9,6 +9,7 @@
 #include "bmp280_sensor.h"
 #include "bmp580_sensor.h"
 #include "htu21d_sensor.h"
+#include "xdb401_sensor.h"
 #include "../logger.h"
 #include "../queues.h"
 #include "../system_state.h"
@@ -37,6 +38,7 @@ static SensorBase* makeSensor(const char* type) {
     if (strcmp(type, "bmp280")  == 0) return new Bmp280Sensor();
     if (strcmp(type, "bmp580")  == 0) return new Bmp580Sensor();
     if (strcmp(type, "htu21d")  == 0) return new Htu21dSensor();
+    if (strcmp(type, "xdb401")  == 0) return new Xdb401Sensor();
     return nullptr;
 }
 
@@ -76,6 +78,11 @@ void sensorsInit() {
         // Set I2C address if provided in config
         uint8_t addr = entry["addr"] | 0;
         if (addr > 0) s->setAddr(addr);
+
+        // XDB401: optional full-scale pressure in Pa
+        float fullscale_pa = entry["fullscale_pa"] | 0.0f;
+        if (fullscale_pa > 0 && strcmp(type, "xdb401") == 0)
+            static_cast<Xdb401Sensor*>(s)->setFullscalePa(fullscale_pa);
 
         // Check for I2C address collisions before initialising
         uint8_t sAddr = s->i2cAddr();

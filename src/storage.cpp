@@ -4,7 +4,9 @@
 #include "board.h"
 #include "logger.h"
 #include <LittleFS.h>
-#ifndef ESP8266
+#ifdef ESP8266
+// SPIFFS global (extern fs::FS SPIFFS) declared in FS.h via LittleFS.h — no extra include needed
+#else
 #  include "esp_littlefs.h"
 #  include "esp_partition.h"
 #endif
@@ -20,6 +22,43 @@ bool storageInit() {
     sensorSetupMutex = xSemaphoreCreateMutex();
 
 #ifdef ESP8266
+    // Before touching LittleFS: try mounting as SPIFFS (used by ESPEasy and
+    // older firmware). If it succeeds and security.dat is present, extract WiFi
+    // credentials now — they'll be saved to our LittleFS config after it's ready.
+    // SecurityStruct layout: WifiSSID[32] | WifiKey[64] | WifiSSID2[32] | WifiKey2[64]
+    static char spiffsSSID[33]  = {};
+    static char spiffsPass[65]  = {};
+    static char spiffsSSID2[33] = {};
+    static char spiffsPass2[65] = {};
+    bool migratedSpiffs = false;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    SPIFFS.setConfig(SPIFFSConfig(false));  // never auto-format — we own this partition
+    if (SPIFFS.begin()) {
+        const char* secPath = SPIFFS.exists("/security.dat") ? "/security.dat"
+                            : SPIFFS.exists("security.dat")  ? "security.dat"
+                            : nullptr;
+        if (secPath) {
+            File f = SPIFFS.open(secPath, "r");
+            if (f && f.size() >= 96) {
+                f.readBytes(spiffsSSID,  sizeof(spiffsSSID)  - 1);
+                f.readBytes(spiffsPass,  sizeof(spiffsPass)  - 1);
+                if (f.size() >= 192) {
+                    f.readBytes(spiffsSSID2, sizeof(spiffsSSID2) - 1);
+                    f.readBytes(spiffsPass2, sizeof(spiffsPass2) - 1);
+                }
+                migratedSpiffs = strlen(spiffsSSID) > 0;
+            }
+            if (f) f.close();
+        }
+        SPIFFS.end();
+        if (migratedSpiffs)
+            logMessage(String("SPIFFS security.dat: migrating SSID=") + spiffsSSID, "warn");
+        else
+            logMessage("SPIFFS mounted but no usable security.dat", "warn");
+    }
+#pragma GCC diagnostic pop
+
     bool ok = LittleFS.begin();
     if (!ok) {
         logMessage("LittleFS mount failed — formatting", "warn");
@@ -70,6 +109,11 @@ bool storageInit() {
         return false;
     }
 
+#ifdef ESP8266
+    if (migratedSpiffs && !LittleFS.exists(WIFI_CONF_PATH))
+        saveWifiCreds(spiffsSSID, spiffsPass, spiffsSSID2, spiffsPass2);
+#endif
+
     File root = LittleFS.open("/", "r");
     File entry = root.openNextFile();
     while (entry) {
@@ -107,7 +151,37 @@ static bool writeJson(const char* path, const JsonDocument& doc) {
 bool loadWifiCreds(char* ssid, size_t ssidLen, char* pass, size_t passLen,
                    char* ssid2, size_t ssid2Len, char* pass2, size_t pass2Len) {
     JsonDocument doc;
-    if (!readJson(WIFI_CONF_PATH, doc)) return false;
+    if (!readJson(WIFI_CONF_PATH, doc)) {
+#ifdef ESP8266
+        // Try ESPEasy security.dat — survives OTA; binary struct layout:
+        //   offset   0: WifiSSID[32]
+        //   offset  32: WifiKey[64]
+        //   offset  96: WifiSSID2[32]
+        //   offset 128: WifiKey2[64]
+        if (lfsReady && LittleFS.exists("/security.dat")) {
+            File f = LittleFS.open("/security.dat", "r");
+            if (f && f.size() >= 96) {
+                memset(ssid, 0, ssidLen);
+                memset(pass, 0, passLen);
+                f.readBytes(ssid, min((size_t)32, ssidLen - 1));
+                f.readBytes(pass, min((size_t)64, passLen - 1));
+                if (f.size() >= 192 && ssid2 && ssid2Len > 1) {
+                    memset(ssid2, 0, ssid2Len);
+                    memset(pass2, 0, pass2Len);
+                    f.readBytes(ssid2, min((size_t)32, ssid2Len - 1));
+                    f.readBytes(pass2, min((size_t)64, pass2Len - 1));
+                }
+                f.close();
+                if (strlen(ssid) > 0) {
+                    logMessage(String("ESPEasy security.dat: using SSID=") + ssid, "warn");
+                    saveWifiCreds(ssid, pass, ssid2 ? ssid2 : "", pass2 ? pass2 : "");
+                    return true;
+                }
+            } else if (f) f.close();
+        }
+#endif
+        return false;
+    }
     const char* s  = doc["ssid"]  | "";
     const char* p  = doc["pass"]  | "";
     const char* s2 = doc["ssid2"] | "";
