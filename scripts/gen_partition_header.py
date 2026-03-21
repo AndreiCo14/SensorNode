@@ -15,11 +15,8 @@ hdr_path    = os.path.join(out_dir, "target_partitions.h")
 os.makedirs(out_dir, exist_ok=True)
 
 # gen_esp32part.py ships with the Arduino ESP32 framework
-gen_part = os.path.join(
-    env.subst("$PACKAGES_DIR"),
-    "framework-arduinoespressif32",
-    "tools", "gen_esp32part.py"
-)
+framework_dir = env.PioPlatform().get_package_dir("framework-arduinoespressif32")
+gen_part = os.path.join(framework_dir, "tools", "gen_esp32part.py")
 if not os.path.exists(gen_part):
     print("gen_partition_header.py: gen_esp32part.py not found at", gen_part)
     exit(1)
