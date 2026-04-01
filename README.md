@@ -17,15 +17,15 @@
 
 ## Overview
 
-AirMQ SensorNode is open-source firmware for ESP8266 and ESP32-C3 microcontrollers. It reads data from a variety of local sensors and publishes batched readings to an MQTT broker. Configuration is done through a built-in web interface accessible over WiFi.
+AirMQ SensorNode is open-source firmware for Espressif ESP8266 and ESP32 microcontroller families. It reads data from a variety of local sensors and publishes batched readings to an MQTT broker. Configuration is done through a built-in web interface accessible over WiFi.
 
 **Key capabilities:**
 - Supports 11 sensor types (temperature, humidity, pressure, CO₂, VOC, particulates, 1-Wire)
-- Batches readings and publishes as JSON arrays to MQTT
+- Batches readings and publishes as JSON arrays to the AirMQ backend via MQTT
 - Built-in web dashboard for all configuration and OTA firmware updates
 - Real-time log stream via WebSocket
 - Captive portal for first-time WiFi setup
-- Runtime feature flags to reduce heap usage on ESP8266
+- Runtime feature configuration and device control 
 
 ---
 
@@ -35,14 +35,15 @@ AirMQ SensorNode is open-source firmware for ESP8266 and ESP32-C3 microcontrolle
 
 | MCU | Flash | RAM | Notes |
 |-----|-------|-----|-------|
-| ESP8266 (D1 Mini) | 4 MB | ~80 KB heap | Cooperative multitasking, tight memory |
+| ESP8266 (AirMQ board or any development board) | 4 MB | ~80 KB heap | Cooperative multitasking, tight memory |
 | ESP32-C3 | 4 MB | ~300 KB heap | FreeRTOS tasks, USB-CDC serial |
+Other Espressif MCUs and devboards may be easily added 
 
 ### Default Pin Assignments
 
 Pins can be changed at runtime in **Hardware Setup**. These are the compiled-in defaults.
 
-**ESP8266 (D1 Mini)**
+**ESP8266 ([AirMQ v0.x](https://github.com/AirMQ/AirMQ-sensor/tree/master/Hardware/Mainboard), D1 Mini, etc.)**
 
 | Function | GPIO | D-pin |
 |----------|------|-------|
@@ -54,7 +55,7 @@ Pins can be changed at runtime in **Hardware Setup**. These are the compiled-in 
 | WS2812B LED | — | not set |
 | 5 V boost enable | 15 | D8 |
 
-**ESP32-C3**
+**ESP32-C3 ([AirMQ v2.x](https://github.com/AirMQ/AirMQ-sensor/tree/master/Hardware/Mainboard/2.0.2))**
 
 | Function | GPIO |
 |----------|------|
