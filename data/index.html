@@ -145,7 +145,6 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
     <div class="form-row"><label>UART TX</label><input type="number" id="hw-utx" min="-1" max="48"></div>
     <div class="form-row"><label>1-Wire pin</label><input type="number" id="hw-ow" min="-1" max="48"></div>
     <div class="form-row"><label>LED pin</label><input type="number" id="hw-led" min="-1" max="48" title="-1 = disabled"></div>
-    <div class="form-row"><label>Interval (s)</label><input type="number" id="hw-interval" min="1" max="3600"></div>
     <button class="btn" onclick="saveHwConfig()">Save</button>
     <div class="msg" id="hw-msg"></div>
   </section>
@@ -335,7 +334,6 @@ function loadHwConfig() {
     document.getElementById('hw-utx').value      = d.uart_tx  !== undefined ? d.uart_tx  : 1;
     document.getElementById('hw-ow').value       = d.onewire  !== undefined ? d.onewire  : 2;
     document.getElementById('hw-led').value      = d.led_pin  !== undefined ? d.led_pin  : -1;
-    document.getElementById('hw-interval').value = d.interval !== undefined ? d.interval : 60;
   }).catch(function(){});
 }
 
@@ -346,8 +344,7 @@ function saveHwConfig() {
     uart_rx:  parseInt(document.getElementById('hw-urx').value),
     uart_tx:  parseInt(document.getElementById('hw-utx').value),
     onewire:  parseInt(document.getElementById('hw-ow').value),
-    led_pin:  parseInt(document.getElementById('hw-led').value),
-    interval: parseInt(document.getElementById('hw-interval').value)
+    led_pin:  parseInt(document.getElementById('hw-led').value)
   };
   fetch('/api/hw/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
     .then(function(r){return r.json()})

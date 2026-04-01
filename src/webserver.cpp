@@ -191,7 +191,6 @@ static void handleGetHwConfig() {
     doc["onewire"]       = cfg.onewire;
     doc["led_pin"]       = cfg.led_pin;
     doc["5v_pin"]        = cfg.pin5v;
-    doc["interval"]      = cfg.intervalSec;
     doc["teleIntervalM"] = cfg.teleIntervalM;
     doc["sampleNum"]     = cfg.sampleNum;
     doc["onTime"]        = cfg.onTime;
@@ -215,7 +214,6 @@ static void handlePostHwConfig() {
     if (!doc["onewire"].isNull())       cfg.onewire       = doc["onewire"].as<int8_t>();
     if (!doc["led_pin"].isNull())       cfg.led_pin       = doc["led_pin"].as<int8_t>();
     if (!doc["5v_pin"].isNull())        cfg.pin5v         = doc["5v_pin"].as<int8_t>();
-    if (!doc["interval"].isNull())      cfg.intervalSec   = doc["interval"].as<uint16_t>();
     if (!doc["teleIntervalM"].isNull()) cfg.teleIntervalM = doc["teleIntervalM"].as<uint16_t>();
     if (!doc["sampleNum"].isNull())     cfg.sampleNum     = doc["sampleNum"].as<int8_t>();
     if (!doc["onTime"].isNull())        cfg.onTime        = doc["onTime"].as<uint16_t>();
@@ -260,7 +258,6 @@ static void handleGetConfigExport() {
     doc["hw"]["onewire"]       = hw.onewire;
     doc["hw"]["led_pin"]       = hw.led_pin;
     doc["hw"]["5v_pin"]        = hw.pin5v;
-    doc["hw"]["interval"]      = hw.intervalSec;
     doc["hw"]["teleIntervalM"] = hw.teleIntervalM;
     doc["hw"]["sampleNum"]     = hw.sampleNum;
     doc["hw"]["onTime"]        = hw.onTime;

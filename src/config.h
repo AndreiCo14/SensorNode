@@ -18,6 +18,7 @@
 // ─── Uplink / telemetry ───────────────────────────────────────────────────────
 #define DEFAULT_SAMPLE_NUM          1
 #define DEFAULT_TELE_INTERVAL_M     30
+#define DEFAULT_SENSOR_INTERVAL_S   60   // sensor polling interval in seconds
 #define AP_WINDOW_MS                180000UL
 #define WIFI_PRIMARY_TIMEOUT_MS     30000UL
 
