@@ -15,6 +15,9 @@
 
 static WebServerT httpServer(80);
 static volatile bool rebootPending = false;
+static bool s_webEnabled = true;
+
+void webSetEnabled(bool en) { s_webEnabled = en; }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -437,6 +440,33 @@ static void handleStaticFile(const String& path) {
     file.close();
 }
 
+// ─── GET|POST /api/features ───────────────────────────────────────────────────
+
+static void handleGetFeatures() {
+    FeatureFlags f;
+    loadFeatures(f);
+    JsonDocument doc;
+    doc["web"]   = f.web;
+    doc["wsLog"] = f.wsLog;
+    sendJsonDoc(200, doc);
+}
+
+static void handlePostFeatures() {
+    if (!httpServer.hasArg("plain")) { sendJson(400, "{\"error\":\"no body\"}"); return; }
+    JsonDocument doc;
+    if (deserializeJson(doc, httpServer.arg("plain"))) {
+        sendJson(400, "{\"error\":\"invalid JSON\"}"); return;
+    }
+    FeatureFlags f;
+    loadFeatures(f);
+    if (!doc["web"].isNull())   f.web   = doc["web"].as<bool>();
+    if (!doc["wsLog"].isNull()) f.wsLog = doc["wsLog"].as<bool>();
+    if (!saveFeatures(f)) { sendJson(500, "{\"error\":\"save failed\"}"); return; }
+    sendJson(200, "{\"ok\":true,\"msg\":\"Rebooting...\"}");
+    logMessage("Features saved — rebooting", "info");
+    rebootPending = true;
+}
+
 // ─── Web task ─────────────────────────────────────────────────────────────────
 
 static void webServerSetup() {
@@ -471,6 +501,10 @@ static void webServerSetup() {
     httpServer.on("/api/config/export", HTTP_GET,  handleGetConfigExport);
     httpServer.on("/api/config/reset",  HTTP_POST, handleConfigReset);
 
+    // Features
+    httpServer.on("/api/features", HTTP_GET,  handleGetFeatures);
+    httpServer.on("/api/features", HTTP_POST, handlePostFeatures);
+
     // Other
     httpServer.on("/api/state",      HTTP_GET,  handleGetState);
     httpServer.on("/api/cmd",        HTTP_POST, handlePostCmd);
@@ -493,13 +527,15 @@ static void webServerSetup() {
 }
 
 void webTask(void* pvParameters) {
-    webServerSetup();
+    if (s_webEnabled) webServerSetup();
     for (;;) {
-        httpServer.handleClient();
-        if (rebootPending) {
-            logMessage("Rebooting...", "info");
-            vTaskDelay(pdMS_TO_TICKS(500));
-            DEVICE_RESTART();
+        if (s_webEnabled) {
+            httpServer.handleClient();
+            if (rebootPending) {
+                logMessage("Rebooting...", "info");
+                vTaskDelay(pdMS_TO_TICKS(500));
+                DEVICE_RESTART();
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(5));
     }
@@ -507,10 +543,11 @@ void webTask(void* pvParameters) {
 
 #ifdef ESP8266
 void webInit() {
-    webServerSetup();
+    if (s_webEnabled) webServerSetup();
 }
 
 void webProcess() {
+    if (!s_webEnabled) return;
     httpServer.handleClient();
     if (rebootPending) {
         logMessage("Rebooting...", "info");

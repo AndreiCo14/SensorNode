@@ -8,7 +8,11 @@
 #define LOG_QUEUE_SIZE          16
 
 // ─── Logging ──────────────────────────────────────────────────────────────────
+#ifdef ESP8266
+#define LOG_RING_SIZE           12   // reduced to save ~6 KB BSS on ESP8266
+#else
 #define LOG_RING_SIZE           50
+#endif
 #define LOG_MSG_MAX_LEN         160
 
 // ─── Uplink / telemetry ───────────────────────────────────────────────────────

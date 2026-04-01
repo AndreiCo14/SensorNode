@@ -1,5 +1,6 @@
 #pragma once
 
+void webSetEnabled(bool en);
 void webTask(void* pvParameters);
 
 #ifdef ESP8266

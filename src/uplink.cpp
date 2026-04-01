@@ -349,6 +349,21 @@ static void handleCommand(const char* payload) {
         return;
     }
 
+    if (doc["feature"].is<const char*>()) {
+        const char* name = doc["feature"].as<const char*>();
+        bool val = doc["value"] | true;
+        FeatureFlags f;
+        loadFeatures(f);
+        if      (strcmp(name, "web")   == 0) f.web   = val;
+        else if (strcmp(name, "wsLog") == 0) f.wsLog = val;
+        else { logMessage(String("Unknown feature: ") + name, "warn"); return; }
+        saveFeatures(f);
+        logMessage(String("feature '") + name + "' -> " + (val ? "on" : "off") + ", rebooting", "info");
+        vTaskDelay(pdMS_TO_TICKS(500));
+        DEVICE_RESTART();
+        return;
+    }
+
     bool needsSave = false;
 
     if (!doc["teleIntervalM"].isNull()) {
