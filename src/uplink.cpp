@@ -518,7 +518,7 @@ static bool wifiApWindow(const char* ssid1, const char* pass1,
     bool hasSta       = hasPrimary || hasSecondary;
 
     WiFi.mode(hasSta ? WIFI_AP_STA : WIFI_AP);
-    WiFi.softAP(g_apSsid);
+    WiFi.softAP(g_apSsid, AP_PASSWORD);
     dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
 
     STATE_SET(apMode, true);
@@ -680,7 +680,7 @@ void uplinkTask(void* pvParameters) {
         if (apRequested) {
             apRequested = false;
             WiFi.mode(WIFI_AP_STA);
-            WiFi.softAP(g_apSsid);
+            WiFi.softAP(g_apSsid, AP_PASSWORD);
             dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
             STATE_SET(apMode, true);
             logMessage(String("AP re-enabled: ") + g_apSsid, "info");
@@ -740,7 +740,7 @@ void uplinkInit() {
     bool hasSta       = hasPrimary || hasSecondary;
 
     WiFi.mode(hasSta ? WIFI_AP_STA : WIFI_AP);
-    WiFi.softAP(g_apSsid);
+    WiFi.softAP(g_apSsid, AP_PASSWORD);
     dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
     STATE_SET(apMode, true);
 
@@ -854,7 +854,7 @@ void uplinkProcess() {
             if (apRequested) {
                 apRequested = false;
                 WiFi.mode(WIFI_AP_STA);
-                WiFi.softAP(g_apSsid);
+                WiFi.softAP(g_apSsid, AP_PASSWORD);
                 dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
                 STATE_SET(apMode, true);
                 logMessage(String("AP re-enabled: ") + g_apSsid, "info");

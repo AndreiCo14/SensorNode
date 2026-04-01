@@ -1,5 +1,10 @@
 #pragma once
 
+// AP mode password (WPA2) — used when no STA credentials are configured
+#ifndef AP_PASSWORD
+#  define AP_PASSWORD   "configesp"
+#endif
+
 // Default WiFi credentials — overridden at runtime by /wifi.json
 #ifndef DEFAULT_WIFI_SSID
 #  define DEFAULT_WIFI_SSID     ""
