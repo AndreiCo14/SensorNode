@@ -8,8 +8,10 @@
 static WebSocketsServer wsServer(81);
 static bool wsStarted = false;
 static bool debugLogEnabled = false;
+static bool s_wsEnabled = true;
 
 void setDebugLog(bool en) { debugLogEnabled = en; }
+void loggerSetWsEnabled(bool en) { s_wsEnabled = en; }
 
 static LogEntry ringBuffer[LOG_RING_SIZE];
 static size_t   ringIndex = 0;
@@ -61,13 +63,15 @@ static void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
 
 void loggerTask(void* pvParameters) {
     ringMutex = xSemaphoreCreateMutex();
-    wsServer.begin();
-    wsServer.onEvent(onWsEvent);
-    wsStarted = true;
+    if (s_wsEnabled) {
+        wsServer.begin();
+        wsServer.onEvent(onWsEvent);
+        wsStarted = true;
+    }
 
     LogEntry entry;
     for (;;) {
-        wsServer.loop();
+        if (wsStarted) wsServer.loop();
         if (xQueueReceive(logQueue, &entry, pdMS_TO_TICKS(10)) == pdTRUE) {
             if (xSemaphoreTake(ringMutex, pdMS_TO_TICKS(50))) {
                 ringBuffer[ringIndex] = entry;
@@ -85,13 +89,15 @@ void loggerTask(void* pvParameters) {
 #ifdef ESP8266
 void loggerInit() {
     ringMutex = xSemaphoreCreateMutex();
-    wsServer.begin();
-    wsServer.onEvent(onWsEvent);
-    wsStarted = true;
+    if (s_wsEnabled) {
+        wsServer.begin();
+        wsServer.onEvent(onWsEvent);
+        wsStarted = true;
+    }
 }
 
 void loggerProcess() {
-    wsServer.loop();
+    if (wsStarted) wsServer.loop();
     LogEntry entry;
     if (xQueueReceive(logQueue, &entry, 0) == pdTRUE) {
         if (xSemaphoreTake(ringMutex, 0)) {
@@ -99,8 +105,10 @@ void loggerProcess() {
             ringIndex = (ringIndex + 1) % LOG_RING_SIZE;
             xSemaphoreGive(ringMutex);
         }
-        String msg = serializeEntry(entry);
-        wsServer.broadcastTXT(msg);
+        if (wsStarted) {
+            String msg = serializeEntry(entry);
+            wsServer.broadcastTXT(msg);
+        }
     }
 }
 #endif

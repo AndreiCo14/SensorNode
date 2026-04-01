@@ -321,3 +321,22 @@ bool saveSensorSetup() {
     return ok;
 }
 
+
+// ─── Feature flags ────────────────────────────────────────────────────────────
+
+bool loadFeatures(FeatureFlags& f) {
+    f.web   = true;
+    f.wsLog = true;
+    JsonDocument doc;
+    if (!readJson(FEATURES_CONF_PATH, doc)) return false;
+    f.web   = doc["web"]   | true;
+    f.wsLog = doc["wsLog"] | true;
+    return true;
+}
+
+bool saveFeatures(const FeatureFlags& f) {
+    JsonDocument doc;
+    doc["web"]   = f.web;
+    doc["wsLog"] = f.wsLog;
+    return writeJson(FEATURES_CONF_PATH, doc);
+}

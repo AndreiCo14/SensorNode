@@ -196,6 +196,17 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
     <div id="i2c-result" style="margin-top:8px;font-size:12px;min-height:20px"></div>
   </section>
 
+  <!-- Features -->
+  <section id="features-section" class="draggable-section" draggable="true">
+    <h2>Features</h2>
+    <div style="font-size:11px;color:#666;margin-bottom:8px">Changes take effect after reboot</div>
+    <div class="form-row"><label>WebSocket Log (port 81)</label><input type="checkbox" id="feat-wslog" checked></div>
+    <div class="form-row"><label>Web UI (port 80)</label><input type="checkbox" id="feat-web" checked></div>
+    <div id="feat-web-warn" style="display:none;font-size:11px;color:#e57373;margin:2px 0 6px 90px">Disabling requires MQTT cmd to re-enable</div>
+    <button class="btn" onclick="saveFeatures()">Apply &amp; Reboot</button>
+    <div class="msg" id="feat-msg"></div>
+  </section>
+
   <!-- Log Stream -->
   <section id="log-section" class="full">
     <h2>Log Stream</h2>
@@ -464,6 +475,30 @@ function toggleDebug() {
   btn.style.borderColor = debugOn ? '#4caf50' : '';
 }
 
+// ── Features ───────────────────────────────────────────────────────────────────
+function loadFeatures() {
+  fetch('/api/features')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      document.getElementById('feat-wslog').checked = d.wsLog !== false;
+      document.getElementById('feat-web').checked   = d.web   !== false;
+    })
+    .catch(function(){});
+}
+document.getElementById('feat-web').addEventListener('change', function() {
+  document.getElementById('feat-web-warn').style.display = this.checked ? 'none' : 'block';
+});
+function saveFeatures() {
+  var web   = document.getElementById('feat-web').checked;
+  var wslog = document.getElementById('feat-wslog').checked;
+  if (!web && !confirm('Disabling the web UI requires MQTT to re-enable it. Continue?')) return;
+  fetch('/api/features', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({web: web, wsLog: wslog})})
+    .then(function(r){return r.json()})
+    .then(function(d){showMsg('feat-msg', d.ok ? (d.msg||'Saved') : ('Error: '+d.error), d.ok)})
+    .catch(function(){showMsg('feat-msg','Request failed',false)});
+}
+
 // ── OTA ────────────────────────────────────────────────────────────────────────
 function doOta() {
   var file = document.getElementById('ota-file').files[0];
@@ -568,6 +603,7 @@ loadWifi();
 loadMqttConfig();
 loadHwConfig();
 loadSensorSetup();
+loadFeatures();
 connectWs();
 setInterval(loadState, 15000);
 

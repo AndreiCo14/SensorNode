@@ -24,7 +24,11 @@ struct SensorReading {
 
 // ─── MQTT command — produced by webTask/MQTT callback, consumed by uplinkTask ─
 struct MqttCommand {
+#ifdef ESP8266
+    char payload[256];  // reduced to save ~1.3 KB queue memory on ESP8266
+#else
     char payload[512];
+#endif
 };
 
 // ─── Log entry — produced by any task, consumed by loggerTask ────────────────

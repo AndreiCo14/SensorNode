@@ -90,6 +90,16 @@ void setup() {
         Serial.println("Storage init failed — continuing without config");
     loadSensorSetup();
 
+    // ── Feature flags — must be set before loggerInit()/webInit() ──
+    {
+        FeatureFlags feat;
+        loadFeatures(feat);
+        loggerSetWsEnabled(feat.wsLog);
+        webSetEnabled(feat.web);
+        if (!feat.wsLog) Serial.println("WebSocket log disabled (feature flag)");
+        if (!feat.web)   Serial.println("Web server disabled (feature flag)");
+    }
+
     // ── LED + persisted operational params ──
     {
         HwConfig hw;

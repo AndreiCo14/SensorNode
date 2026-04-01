@@ -59,3 +59,14 @@ bool saveHwConfig(const HwConfig& cfg);
 bool loadSensorSetup();
 bool saveSensorSetup();
 
+// ─── Feature flags ────────────────────────────────────────────────────────────
+#define FEATURES_CONF_PATH  "/features.json"
+
+struct FeatureFlags {
+    bool web;    // HTTP server + web UI (port 80)
+    bool wsLog;  // WebSocket log server (port 81)
+};
+
+bool loadFeatures(FeatureFlags& f);
+bool saveFeatures(const FeatureFlags& f);
+
