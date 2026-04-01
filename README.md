@@ -272,21 +272,16 @@ With the default prefix `Sensors/` and a chip ID of `1234567`:
 
 ### Sensor data payload
 
-Published as a JSON array. Each element represents one reading:
+Published as a JSON array. Each element contains `deviceId`, `time`, and the sensor-specific fields merged at the top level:
 
 ```json
 [
-  {
-    "deviceId": 1234567,
-    "time": 1711900800,
-    "count": 42,
-    "mV": 3310,
-    "rssi": -65,
-    "msgType": 202,
-    "data": {"temp": 21.5, "hum": 58.2, "press": 1013.4}
-  }
+  {"deviceId": 1234567, "time": 1711900800, "temp": 21.5, "hum": 58.2, "press": 1013.4},
+  {"deviceId": 1234567, "time": 1711900802, "temp": 21.6, "hum": 58.1, "press": 1013.5}
 ]
 ```
+
+The exact fields inside each object depend on the sensor type — for example a DS18B20 produces `{"temp": 21.5}`, a PMS7003 produces `{"pm1": 3, "pm25": 5, "pm10": 6}`.
 
 The array is flushed when it reaches `sampleNum` readings (default: 1) or when a sensor requests immediate transmission.
 
