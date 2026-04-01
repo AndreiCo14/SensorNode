@@ -116,8 +116,8 @@ static void handlePostWifi() {
     if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
     if (!saveWifiCreds(ssid, pass, ssid2, pass2)) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
     logMessage(String("WiFi saved: ") + ssid, "info");
-    sendJson(200, "{\"ok\":true,\"msg\":\"Saved. Rebooting...\"}");
-    rebootPending = true;
+    sendJson(200, "{\"ok\":true,\"msg\":\"Saved.\"}");
+
 }
 
 // ─── GET /api/wifi/scan ───────────────────────────────────────────────────────
@@ -174,8 +174,8 @@ static void handlePostMqttConfig() {
     if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
     if (!saveMqttConfig(cfg)) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
     logMessage("MQTT config saved", "info");
-    sendJson(200, "{\"ok\":true,\"msg\":\"Saved. Rebooting...\"}");
-    rebootPending = true;
+    sendJson(200, "{\"ok\":true,\"msg\":\"Saved.\"}");
+
 }
 
 // ─── GET /api/hw/config ───────────────────────────────────────────────────────
@@ -222,8 +222,8 @@ static void handlePostHwConfig() {
     if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
     if (!saveHwConfig(cfg)) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
     logMessage("HW config saved", "info");
-    sendJson(200, "{\"ok\":true,\"msg\":\"Saved. Rebooting...\"}");
-    rebootPending = true;
+    sendJson(200, "{\"ok\":true,\"msg\":\"Saved.\"}");
+
 }
 
 // ─── GET /api/sensors/setup ───────────────────────────────────────────────────
@@ -462,9 +462,9 @@ static void handlePostFeatures() {
     if (!doc["web"].isNull())   f.web   = doc["web"].as<bool>();
     if (!doc["wsLog"].isNull()) f.wsLog = doc["wsLog"].as<bool>();
     if (!saveFeatures(f)) { sendJson(500, "{\"error\":\"save failed\"}"); return; }
-    sendJson(200, "{\"ok\":true,\"msg\":\"Rebooting...\"}");
-    logMessage("Features saved — rebooting", "info");
-    rebootPending = true;
+    logMessage("Features saved", "info");
+    sendJson(200, "{\"ok\":true,\"msg\":\"Saved.\"}");
+
 }
 
 // ─── Web task ─────────────────────────────────────────────────────────────────

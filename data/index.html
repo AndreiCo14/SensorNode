@@ -64,9 +64,13 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
 .drag-over{outline:1px solid #7eb8f7}
 .sec-grip{position:absolute;right:4px;top:0;bottom:0;display:flex;align-items:center;cursor:ew-resize;color:#333;user-select:none;font-size:13px}
 .sec-grip:hover{color:#7eb8f7}
+/* Toast */
+#toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#1e2e10;border:1px solid #8bc34a;color:#8bc34a;padding:7px 18px;border-radius:4px;font-size:12px;z-index:999;pointer-events:none;opacity:0;transition:opacity .25s}
+#toast.show{opacity:1}
 </style>
 </head>
 <body>
+<div id="toast"></div>
 <header>
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="4100 5000 10500 12600" height="47" style="flex-shrink:0"><style>.fil0{fill:#7eb8f7}.fil1{fill:#1a1a2e}</style><g><path class="fil0" d="M4996.26 8916.16c147.58,-30.97 607.63,-92.99 687.54,-169.82 492.51,-473.48 576,-716.5 1487.39,-1184.03 1551.97,-796.14 3396.47,-663.79 4857.59,302.18 690.06,456.22 1295.07,1156.5 1640.46,1904.34 79.7,172.57 179.95,499.69 261.89,640.63l400.8 -163.74c-58.59,-417.23 -541.44,-1238.48 -802.62,-1580.31 -1662.08,-2175.33 -4760.53,-2767.55 -7106.69,-1190.38l-410.35 303.99c-56.6,43.32 -71.04,65.35 -124.91,112.55 -293.04,256.76 -696.26,682.96 -891.1,1024.59z"/><path class="fil0" d="M4143.71 11171.54l-35.9 550.95c245.81,-87.52 482.21,-334.48 1136.42,-504.76 1421.16,-369.91 2755.43,261.89 3996.55,810.66 1630.45,720.91 3213.85,1348.49 4992.89,665.13l272.86 -130c41.53,-31.3 67.81,-448.54 77.09,-526.25 -421.4,138.17 -524.12,303.15 -1236.56,431 -1396.18,250.55 -2790.05,-349.08 -3996.19,-894.19 -1222.15,-552.35 -2588.22,-1129.02 -3997.03,-852.47 -534.53,104.92 -783.84,268.9 -1210.13,449.93z"/><path class="fil0" d="M4373.13 10350.09c375.36,-133.94 478.4,-307.24 1176.58,-440.1 2538.18,-483.01 4832.06,2155.86 7719,1791.7 353.98,-44.65 1013.32,-187.69 1256.3,-369.04l-67.46 -449.42c-140.49,29.48 -413.85,166.66 -594.07,222.6 -731.56,227.05 -1445,209.53 -2186.35,44.57 -1740.34,-387.23 -3173.29,-1490.58 -4946.31,-1716.98 -524.38,-66.96 -1026.33,-42.55 -1521.03,83.68 -158.79,40.52 -507.83,127.69 -592.45,226.69 -53.95,63.11 -221.18,501.27 -244.21,606.3z"/><path class="fil0" d="M4275.06 12839.75c173.69,-63.28 367.89,-187.5 580.56,-264.69 1641.23,-595.71 3060.08,164.69 4539.9,806.19 1249.31,541.58 2579.03,1057.51 4007.49,783.78 137.36,-26.32 552.59,-108.6 629.47,-191.19 51.36,-55.18 224.22,-473.94 241.74,-569.24 -443.7,156.5 -707.66,294.62 -1248.93,353.18 -3096.37,334.97 -5534.92,-3062.86 -8845.11,-1381.93 -0.96,139.37 29.34,358.84 94.88,463.9z"/><path class="fil0" d="M10451.41 16306.19c-37.3,-271.97 353.7,-325.6 396.6,-68.75 45.53,272.66 -363.62,309.27 -396.6,68.75zm-1510.88 -2172.21c233.26,-104.9 372.58,283.66 139.94,368.92 -254.39,93.23 -411.36,-246.85 -139.94,-368.92zm-274.34 -182.67c-207.53,180.98 -330.03,899.71 505.72,845.8 58.71,83.11 380.23,405.42 470.22,480.56 141.17,117.87 655.34,62.38 876.3,62.38l1859.73 5.88c-885.66,804.38 -430.92,716.52 -1256.63,718.65 -73.47,-122.58 -91.29,-173.36 -224.93,-243.2 -708.47,-370.26 -1096.18,820.76 -340.46,948.24 362.03,61.06 475.62,-164.08 572.31,-296.24 468.88,0.67 644.98,63.38 831.43,-127.85l940.53 -937.76c64.01,-63.38 198.13,-153.48 186.7,-289.99 -11.98,-143.18 -123.22,-179.21 -265.46,-181.26 -870.05,-12.55 -2029.53,32.54 -2834.51,3.32 -236.64,-8.59 -281.39,-231.03 -526.9,-404.08 141.02,-814 -570.85,-779.11 -794.05,-584.45z"/><path class="fil0" d="M7611.38 16352.69c216.34,-116.33 389.4,226.34 181.31,350.62 -217.23,129.73 -462.66,-199.33 -181.31,-350.62zm-1271.08 -2091.59c256.75,-100.72 365.14,298.85 146.72,371.63 -280.56,93.48 -401.95,-271.51 -146.72,-371.63zm879.41 2033.32c-64.28,361.82 -23.45,574.11 255.9,700.69 622.96,282.26 1023.83,-643.51 442.3,-919.7 -144.55,-68.65 -318.72,-20.08 -395.75,-55.6 -23.62,-10.89 -217.17,-211 -253.32,-247.09 -329.39,-328.83 -228.62,-190 -774.15,-220.89 -180.19,-10.2 -366.1,-270.6 -555.73,-459.84 -625.4,-624.13 -616.01,-494.17 -613.95,-902.18 0.81,-161.87 0.69,-324.27 -0.63,-486.73l877.24 8.14c-4.1,260.88 53.09,225.61 -110.58,363.05 -84.15,70.67 -155.15,155.41 -173.59,303.78 -79.04,636.07 821.4,761.83 966.67,197.44 105.67,-410.52 -232.16,-491.72 -272.3,-623.8 2.1,-396.32 103.34,-657.27 -324.92,-655.45 -317.9,1.35 -635.9,2.08 -953.83,0.75 -483.98,-2.01 -415.65,60.35 -415.46,522.42 0.45,1086.21 -156.18,684.66 1019.46,1856.49 244.46,243.66 183.21,284.81 666.09,280.93 479.79,-3.86 230.23,55.04 616.55,337.59z"/><path class="fil0" d="M6685.35 8763.62c95.68,63.84 329.33,68.82 465.25,93.67 190.55,34.84 257.11,-67.75 400.06,-148.52 1340.97,-757.74 3049.02,-589.94 4130.84,376.49 348.31,311.17 925.26,958.46 1048.11,1544.04 437.11,1.02 500,8.32 443.34,-146.82 -60.81,-166.47 -131.31,-336.97 -206.96,-486.77 -1193.76,-2363.73 -4298.51,-2936.24 -6280.64,-1232.09z"/><path class="fil0" d="M9189.49 16611.15c271.47,-102.61 369.05,295.71 150.6,371.13 -277.52,95.81 -386.44,-281.98 -150.6,-371.13zm-1692.91 -3120.34c242.46,-128.43 388.81,238.19 185.65,350.5 -248.61,137.44 -418.77,-227.03 -185.65,-350.5zm294.72 641.83c191.44,-70.76 366.32,-290.59 288.02,-597.31 -52.7,-206.45 -248.63,-373.45 -496.84,-372.35 -580.07,2.57 -671.37,796.51 -201.35,965.02 5.99,533.96 1.84,407.88 285.62,691.26l979.86 977.81c113.53,117.76 447.51,438.43 408.9,535.57 -20.82,52.4 -354.51,176.36 -275.18,574.57 102.38,513.96 886.08,506.93 967.8,-22.89 59.77,-387.6 -258.04,-496.92 -280.46,-551.68 -5.52,-244.43 37.8,-253.52 -118.48,-391.68 -79.05,-69.89 -138.7,-153.59 -226.84,-249.27l-966.09 -965.11c-373.65,-373.11 -368.86,-286.36 -364.96,-593.94z"/><path class="fil0" d="M8303.96 9163.34c98.28,79.92 292.9,121.7 424.7,176.07 401.7,165.7 758.14,-138.21 1608.49,243.5 321.22,144.19 344.13,189.46 570.44,355.05 183.83,134.51 396.56,440.64 476.19,477.68 88.29,41.05 401.61,107.96 516.41,126.86 -107.34,-294.37 -396.73,-618.34 -575.22,-783.96 -523.38,-485.65 -1131.29,-777.21 -1890.23,-797.59 -305.19,-8.2 -903.11,60.41 -1130.78,202.39z"/><path class="fil1" d="M6340.3 14261.1c-255.23,100.12 -133.84,465.11 146.72,371.63 218.42,-72.78 110.03,-472.35 -146.72,-371.63z"/><path class="fil1" d="M9189.49 16611.15c-235.84,89.15 -126.92,466.94 150.6,371.13 218.45,-75.42 120.87,-473.74 -150.6,-371.13z"/><path class="fil1" d="M10451.41 16306.19c32.98,240.52 442.13,203.91 396.6,-68.75 -42.9,-256.85 -433.9,-203.22 -396.6,68.75z"/><path class="fil1" d="M8940.53 14133.98c-271.42,122.07 -114.45,462.15 139.94,368.92 232.64,-85.26 93.32,-473.82 -139.94,-368.92z"/><path class="fil1" d="M7611.38 16352.69c-281.35,151.29 -35.92,480.35 181.31,350.62 208.09,-124.28 35.03,-466.95 -181.31,-350.62z"/><path class="fil1" d="M7496.58 13490.81c-233.12,123.47 -62.96,487.94 185.65,350.5 203.16,-112.31 56.81,-478.93 -185.65,-350.5z"/></g></svg>
   <h1>AirMQ SensorNode</h1>
@@ -111,7 +115,7 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
         <div style="font-size:10px;color:#aaa;margin:4px 0 2px;text-transform:uppercase">Backup</div>
         <div class="form-row"><label>SSID</label><input type="text" id="wifi-ssid2" placeholder="Backup network"></div>
         <div class="form-row"><label>Password</label><input type="password" id="wifi-pass2" placeholder="leave empty for open"></div>
-        <button class="btn" onclick="saveWifi()">Save &amp; Reboot</button>
+        <button class="btn" onclick="saveWifi()">Save</button>
         <div class="msg" id="wifi-msg"></div>
       </div>
       <div id="wifi-scan-list" style="display:none;flex:1;min-width:200px">
@@ -128,7 +132,7 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
     <div class="form-row"><label>Port</label><input type="number" id="mqtt-port" min="1" max="65535"></div>
     <div class="form-row"><label>Topic Prefix</label><input type="text" id="mqtt-prefix" placeholder="Sensors/" style="width:140px"></div>
     <div class="form-row"><label>TLS / MQTTS</label><input type="checkbox" id="mqtt-tls"></div>
-    <button class="btn" onclick="saveMqttConfig()">Save &amp; Reboot</button>
+    <button class="btn" onclick="saveMqttConfig()">Save</button>
     <div class="msg" id="mqtt-msg"></div>
   </section>
 
@@ -142,7 +146,7 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
     <div class="form-row"><label>1-Wire pin</label><input type="number" id="hw-ow" min="-1" max="48"></div>
     <div class="form-row"><label>LED pin</label><input type="number" id="hw-led" min="-1" max="48" title="-1 = disabled"></div>
     <div class="form-row"><label>Interval (s)</label><input type="number" id="hw-interval" min="1" max="3600"></div>
-    <button class="btn" onclick="saveHwConfig()">Save &amp; Reboot</button>
+    <button class="btn" onclick="saveHwConfig()">Save</button>
     <div class="msg" id="hw-msg"></div>
   </section>
 
@@ -199,11 +203,10 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
   <!-- Features -->
   <section id="features-section" class="draggable-section" draggable="true">
     <h2>Features</h2>
-    <div style="font-size:11px;color:#666;margin-bottom:8px">Changes take effect after reboot</div>
     <div class="form-row"><label>WebSocket Log (port 81)</label><input type="checkbox" id="feat-wslog" checked></div>
     <div class="form-row"><label>Web UI (port 80)</label><input type="checkbox" id="feat-web" checked></div>
     <div id="feat-web-warn" style="display:none;font-size:11px;color:#e57373;margin:2px 0 6px 90px">Disabling requires MQTT cmd to re-enable</div>
-    <button class="btn" onclick="saveFeatures()">Apply &amp; Reboot</button>
+    <button class="btn" onclick="saveFeatures()">Apply</button>
     <div class="msg" id="feat-msg"></div>
   </section>
 
@@ -291,8 +294,10 @@ function saveWifi() {
     body: JSON.stringify({ssid:ssid, pass:document.getElementById('wifi-pass').value,
       ssid2:document.getElementById('wifi-ssid2').value.trim(),
       pass2:document.getElementById('wifi-pass2').value})
-  }).then(function(r){return r.json()}).then(function(d){showMsg('wifi-msg',d.ok?(d.msg||'OK'):('Error: '+d.error),d.ok)})
-    .catch(function(){showMsg('wifi-msg','Request failed',false)});
+  }).then(function(r){return r.json()}).then(function(d){
+    showMsg('wifi-msg',d.ok?(d.msg||'Saved'):('Error: '+d.error),d.ok);
+    if(d.ok) showToast('Saved — reboot to apply');
+  }).catch(function(){showMsg('wifi-msg','Request failed',false)});
 }
 
 // ── MQTT Config ────────────────────────────────────────────────────────────────
@@ -315,8 +320,10 @@ function saveMqttConfig() {
   if (!body.broker) { showMsg('mqtt-msg','Broker required',false); return; }
   fetch('/api/mqtt/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
     .then(function(r){return r.json()})
-    .then(function(d){ showMsg('mqtt-msg', d.ok ? (d.msg||'Saved — rebooting') : ('Error: '+d.error), d.ok); })
-    .catch(function(){showMsg('mqtt-msg','Request failed',false)});
+    .then(function(d){
+      showMsg('mqtt-msg', d.ok ? (d.msg||'Saved') : ('Error: '+d.error), d.ok);
+      if(d.ok) showToast('Saved — reboot to apply');
+    }).catch(function(){showMsg('mqtt-msg','Request failed',false)});
 }
 
 // ── Hardware Setup ─────────────────────────────────────────────────────────────
@@ -344,8 +351,10 @@ function saveHwConfig() {
   };
   fetch('/api/hw/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
     .then(function(r){return r.json()})
-    .then(function(d){ showMsg('hw-msg', d.ok ? (d.msg||'Saved — rebooting') : ('Error: '+d.error), d.ok); })
-    .catch(function(){showMsg('hw-msg','Request failed',false)});
+    .then(function(d){
+      showMsg('hw-msg', d.ok ? (d.msg||'Saved') : ('Error: '+d.error), d.ok);
+      if(d.ok) showToast('Saved — reboot to apply');
+    }).catch(function(){showMsg('hw-msg','Request failed',false)});
 }
 
 // ── Sensor Setup ───────────────────────────────────────────────────────────────
@@ -495,8 +504,10 @@ function saveFeatures() {
   fetch('/api/features', {method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({web: web, wsLog: wslog})})
     .then(function(r){return r.json()})
-    .then(function(d){showMsg('feat-msg', d.ok ? (d.msg||'Saved') : ('Error: '+d.error), d.ok)})
-    .catch(function(){showMsg('feat-msg','Request failed',false)});
+    .then(function(d){
+      showMsg('feat-msg', d.ok ? (d.msg||'Saved') : ('Error: '+d.error), d.ok);
+      if(d.ok) showToast('Saved — reboot to apply');
+    }).catch(function(){showMsg('feat-msg','Request failed',false)});
 }
 
 // ── OTA ────────────────────────────────────────────────────────────────────────
@@ -553,6 +564,14 @@ function showMsg(id, text, ok) {
   if (!el) return;
   el.innerHTML = '<span class="'+(ok?'ok':'err')+'">'+text+'</span>';
   setTimeout(function(){el.textContent='';},3000);
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(function(){ t.classList.remove('show'); }, 4000);
 }
 
 function updateHexSpan(inp) {
