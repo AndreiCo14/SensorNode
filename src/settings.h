@@ -28,11 +28,13 @@
 #endif
 
 // MQTT topic suffixes
-#define TOPIC_DATA_SUFFIX   "/sensordata"
-#define TOPIC_TELE_SUFFIX   "/telemetry"
-#define TOPIC_START_SUFFIX  "/Start"
-#define TOPIC_CMD_SUFFIX    "/cmd"
-#define TOPIC_STATUS_SUFFIX "/Status"
+#define TOPIC_DATA_SUFFIX              "/sensordata"
+#define TOPIC_TELE_SUFFIX              "/telemetry"
+#define TOPIC_START_SUFFIX             "/Start"
+#define TOPIC_CMD_SUFFIX               "/cmd"
+#define TOPIC_STATUS_SUFFIX            "/Status"
+#define TOPIC_PROVISION_SUFFIX         "/provision"
+#define TOPIC_PROVISION_BACKUP_SUFFIX  "/provision/backup"
 
 // Firmware build tag (overridden in platformio.ini per environment)
 #ifndef FW_BUILD

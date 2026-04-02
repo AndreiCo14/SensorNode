@@ -21,3 +21,7 @@ src/bridge/target_partitions.bin
 # Scratch factory binaries
 factory/~.*
 factory/factory-*.bin
+
+# Local design/scratch docs
+*-design.md
+docs/*-design.md
