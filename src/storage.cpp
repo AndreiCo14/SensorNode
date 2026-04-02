@@ -203,6 +203,11 @@ bool saveWifiCreds(const char* ssid, const char* pass,
     return writeJson(WIFI_CONF_PATH, doc);
 }
 
+void clearWifiCreds() {
+    LittleFS.remove(WIFI_CONF_PATH);
+}
+
+
 // ─── MQTT config ──────────────────────────────────────────────────────────────
 
 bool loadMqttConfig(MqttConfig& cfg) {
@@ -269,6 +274,7 @@ bool loadHwConfig(HwConfig& cfg) {
         cfg.onTime = doc["onTime"].as<uint16_t>();
         if (cfg.onTime < 30) cfg.onTime = 30;
     }
+    cfg.provisioned = doc["provisioned"] | false;
     return true;
 }
 
@@ -285,6 +291,7 @@ bool saveHwConfig(const HwConfig& cfg) {
     doc["teleIntervalM"] = cfg.teleIntervalM;
     doc["sampleNum"]     = cfg.sampleNum;
     doc["onTime"]        = cfg.onTime;
+    doc["provisioned"]   = cfg.provisioned;
     return writeJson(HW_CONF_PATH, doc);
 }
 

@@ -50,6 +50,11 @@ static bool      apRequested = false;
 static MqttConfig mqttCfgData;
 static uint32_t  s_startupWindowMs = 0;   // set by publishStart(); sensors enabled after window
 
+// ─── Provisioning state ───────────────────────────────────────────────────────
+static char   s_provisionTopic[80] = {};
+static String s_provisionPayload;
+static bool   s_provisionPending = false;
+
 #ifdef ESP8266
 // ── ESP8266 cooperative uplink state machine ──────────────────────────────────
 enum UplinkState { US_AP_WINDOW, US_AP_ONLY, US_CONNECTED };
@@ -132,12 +137,16 @@ void sendTelemetry() {
 #endif
 
     JsonDocument doc;
+    HwConfig hw;
+    loadHwConfig(hw);
+
     doc["Uptime"]      = (now - startTime) / 60;
     doc["RSSI"]        = WiFi.RSSI();
     doc["VCC"]         = vcc;
     doc["freeHeap"]    = (uint32_t)FREE_HEAP();
     doc["curInterval"] = teleInt;
     doc["seq"]         = readings;
+    doc["provisioned"] = hw.provisioned;
 
     static char payload[256];
     serializeJson(doc, payload, sizeof(payload));
@@ -170,6 +179,10 @@ static void publishStart() {
         doc["bootReason"] = (r < 11) ? names[r] : "Unknown";
     }
 #endif
+
+    HwConfig hw;
+    loadHwConfig(hw);
+    doc["provisioned"] = hw.provisioned;
 
     static char payload[256];
     serializeJson(doc, payload, sizeof(payload));
@@ -342,6 +355,107 @@ static void doOtaCheck() {
 
 // ─── MQTT command handler ─────────────────────────────────────────────────────
 
+static String exportProvisioningConfig() {
+    JsonDocument doc;
+
+    doc["timestamp"]     = getEpochTime();
+
+    // Operational params — use active runtime values, not disk
+    doc["teleIntervalM"] = STATE_GET(teleIntervalM);
+    doc["sampleNum"]     = STATE_GET(sampleNum);
+    doc["onTime"]        = STATE_GET(onTime);
+
+    // Pin assignments and provisioned flag have no runtime state — read from disk
+    HwConfig hw;
+    loadHwConfig(hw);
+    doc["provisioned"] = hw.provisioned;
+    doc["interval"]    = hw.intervalSec;
+    doc["i2c_sda"]     = hw.i2c_sda;
+    doc["i2c_scl"]     = hw.i2c_scl;
+    doc["uart_rx"]     = hw.uart_rx;
+    doc["uart_tx"]     = hw.uart_tx;
+    doc["onewire"]     = hw.onewire;
+    doc["led_pin"]     = hw.led_pin;
+    doc["5v_pin"]      = hw.pin5v;
+
+    // Sensor setup — only active (enabled) sensors
+    if (xSemaphoreTake(sensorSetupMutex, pdMS_TO_TICKS(1000))) {
+        JsonArray src = sensorSetupData.as<JsonArray>();
+        JsonArray dst = doc["sensors"].to<JsonArray>();
+        for (JsonObject s : src)
+            if (s["enabled"] | false) dst.add(s);
+        xSemaphoreGive(sensorSetupMutex);
+    }
+
+    // MQTT config
+    JsonObject mqtt  = doc["mqtt"].to<JsonObject>();
+    mqtt["broker"]   = mqttCfgData.broker;
+    mqtt["port"]     = mqttCfgData.port;
+    mqtt["prefix"]   = mqttCfgData.prefix;
+    mqtt["tls"]      = mqttCfgData.tls;
+
+    String out;
+    serializeJson(doc, out);
+    return out;
+}
+
+static void handleProvisioningConfig(const char* payload) {
+    JsonDocument doc;
+    if (deserializeJson(doc, payload)) {
+        logMessage("Provision JSON parse failed", "error");
+        return;
+    }
+
+    HwConfig hw;
+    loadHwConfig(hw);
+    bool hwChanged = false;
+
+    if (!doc["teleIntervalM"].isNull()) { hw.teleIntervalM = doc["teleIntervalM"].as<uint16_t>(); STATE_SET(teleIntervalM, hw.teleIntervalM); hwChanged = true; }
+    if (!doc["sampleNum"].isNull())     { hw.sampleNum     = doc["sampleNum"].as<int8_t>();       STATE_SET(sampleNum, hw.sampleNum);         hwChanged = true; }
+    if (!doc["onTime"].isNull()) {
+        hw.onTime = doc["onTime"].as<uint16_t>();
+        if (hw.onTime < 30) hw.onTime = 30;
+        STATE_SET(onTime, hw.onTime);
+        hwChanged = true;
+    }
+    if (!doc["interval"].isNull()) { hw.intervalSec = doc["interval"].as<uint16_t>(); hwChanged = true; }
+    if (!doc["i2c_sda"].isNull())  { hw.i2c_sda  = doc["i2c_sda"].as<int8_t>();  hwChanged = true; }
+    if (!doc["i2c_scl"].isNull())  { hw.i2c_scl  = doc["i2c_scl"].as<int8_t>();  hwChanged = true; }
+    if (!doc["uart_rx"].isNull())  { hw.uart_rx  = doc["uart_rx"].as<int8_t>();   hwChanged = true; }
+    if (!doc["uart_tx"].isNull())  { hw.uart_tx  = doc["uart_tx"].as<int8_t>();   hwChanged = true; }
+    if (!doc["onewire"].isNull())  { hw.onewire  = doc["onewire"].as<int8_t>();   hwChanged = true; }
+    if (!doc["led_pin"].isNull())  { hw.led_pin  = doc["led_pin"].as<int8_t>();   hwChanged = true; }
+    if (!doc["5v_pin"].isNull())   { hw.pin5v    = doc["5v_pin"].as<int8_t>();    hwChanged = true; }
+
+    hw.provisioned = true;
+    saveHwConfig(hw);
+    if (hwChanged)
+        logMessage("Provision: hwconfig applied", "info");
+    else
+        logMessage("Provision: no hw fields changed, provisioned flag set", "info");
+
+    if (doc["sensors"].is<JsonArray>()) {
+        if (xSemaphoreTake(sensorSetupMutex, pdMS_TO_TICKS(1000))) {
+            sensorSetupData.set(doc["sensors"]);
+            xSemaphoreGive(sensorSetupMutex);
+        }
+        saveSensorSetup();
+        logMessage("Provision: sensor setup applied", "info");
+    }
+
+    if (doc["mqtt"].is<JsonObject>()) {
+        JsonObject mqtt = doc["mqtt"].as<JsonObject>();
+        MqttConfig cfg;
+        loadMqttConfig(cfg);
+        if (!mqtt["broker"].isNull()) strncpy(cfg.broker, mqtt["broker"].as<const char*>(), sizeof(cfg.broker) - 1);
+        if (!mqtt["port"].isNull())   cfg.port   = mqtt["port"].as<uint16_t>();
+        if (!mqtt["prefix"].isNull()) strncpy(cfg.prefix, mqtt["prefix"].as<const char*>(), sizeof(cfg.prefix) - 1);
+        if (!mqtt["tls"].isNull())    cfg.tls    = mqtt["tls"].as<bool>();
+        saveMqttConfig(cfg);
+        logMessage("Provision: MQTT config applied (takes effect on reconnect)", "info");
+    }
+}
+
 static void handleCommand(const char* payload) {
     JsonDocument doc;
     if (deserializeJson(doc, payload)) {
@@ -407,8 +521,29 @@ static void handleCommand(const char* payload) {
     if (doc["cmd"].is<const char*>()) {
         const char* cmd = doc["cmd"];
         if (strcmp(cmd, "reboot")    == 0) { logMessage("Rebooting", "warn"); vTaskDelay(pdMS_TO_TICKS(500)); DEVICE_RESTART(); }
+        if (strcmp(cmd, "wifiReset") == 0) { clearWifiCreds(); logMessage("WiFi credentials cleared — rebooting", "warn"); vTaskDelay(pdMS_TO_TICKS(500)); DEVICE_RESTART(); }
         if (strcmp(cmd, "telemetry") == 0) sendTelemetry();
         if (strcmp(cmd, "otaCheck")  == 0) doOtaCheck();
+        if (strcmp(cmd, "configRestore") == 0) {
+            if (s_provisionTopic[0] && MQTT_CONNECTED()) {
+                HwConfig hw;
+                loadHwConfig(hw);
+                hw.provisioned = false;
+                saveHwConfig(hw);
+                publishStart();
+                MQTT_SUBSCRIBE(s_provisionTopic, 0);
+                logMessage("Config restore requested — provisioned=false, awaiting provision payload", "info");
+            } else {
+                logMessage("Config restore failed — not connected", "warn");
+            }
+        }
+        if (strcmp(cmd, "configBackup") == 0) {
+            char backupTopic[80];
+            buildTopic(backupTopic, sizeof(backupTopic), TOPIC_PROVISION_BACKUP_SUFFIX);
+            String cfgJson = exportProvisioningConfig();
+            MQTT_PUBLISH(backupTopic, 1, false, cfgJson.c_str());
+            logMessage(String("Config backup -> ") + backupTopic, "info");
+        }
         if (strcmp(cmd, "wifiOn")    == 0) apRequested = true;
         if (strcmp(cmd, "wifiOff")   == 0) {
             if (STATE_GET(apMode)) {
@@ -433,9 +568,14 @@ static void onMqttConnect(bool) {
              mqttCfgData.prefix,
              (unsigned long)STATE_GET(chipId),
              TOPIC_CMD_SUFFIX);
+    snprintf(s_provisionTopic, sizeof(s_provisionTopic), "%s%lu%s",
+             mqttCfgData.prefix,
+             (unsigned long)STATE_GET(chipId),
+             TOPIC_PROVISION_SUFFIX);
     s_needsSubscribe     = true;
     s_publishStartSent   = false;
     s_subscribeFailLogged = false;
+    s_provisionPending   = false;
 }
 
 static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
@@ -443,6 +583,7 @@ static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
     s_needsSubscribe     = false;
     s_publishStartSent   = false;
     s_subscribeFailLogged = false;
+    s_provisionPending   = false;
     ledSetState(LED_CONNECTING);
     logMessage(String("MQTT disconnected: ") + espMqttClientTypes::disconnectReasonToString(reason), "warn");
 }
@@ -462,14 +603,22 @@ static void onMqttSubscribe(uint16_t packetId, const espMqttClientTypes::Subscri
 static void onMqttMessage(const espMqttClientTypes::MessageProperties&,
                            const char* topic, const uint8_t* payload,
                            size_t len, size_t index, size_t total) {
-    if (index == 0 && len == total) {
-        MqttCommand cmd;
-        size_t copyLen = len < sizeof(cmd.payload) - 1 ? len : sizeof(cmd.payload) - 1;
-        memcpy(cmd.payload, payload, copyLen);
-        cmd.payload[copyLen] = '\0';
-        logMessage(String("MQTT rx [") + topic + "]: " + cmd.payload, "info");
-        xQueueSend(cmdQueue, &cmd, 0);
+    if (index != 0 || len != total) return;  // ignore fragmented messages
+
+    if (s_provisionTopic[0] && strcmp(topic, s_provisionTopic) == 0) {
+        s_provisionPayload = "";
+        s_provisionPayload.concat((const char*)payload, len);
+        s_provisionPending = true;
+        logMessage("Provision config received", "info");
+        return;
     }
+
+    MqttCommand cmd;
+    size_t copyLen = len < sizeof(cmd.payload) - 1 ? len : sizeof(cmd.payload) - 1;
+    memcpy(cmd.payload, payload, copyLen);
+    cmd.payload[copyLen] = '\0';
+    logMessage(String("MQTT rx [") + topic + "]: " + cmd.payload, "info");
+    xQueueSend(cmdQueue, &cmd, 0);
 }
 
 // ─── MQTT init ────────────────────────────────────────────────────────────────
@@ -577,6 +726,10 @@ static void tryDeferredSubscribe() {
     else if (mqttPlain) subId = mqttPlain->subscribe(s_cmdTopic, 0);
     if (subId) {
         logMessage("Subscribed: " + String(s_cmdTopic), "info");
+        // Also subscribe to provisioning topic (QoS 0 — retained msg delivery only)
+        if (mqttSecure) mqttSecure->subscribe(s_provisionTopic, 0);
+        else if (mqttPlain) mqttPlain->subscribe(s_provisionTopic, 0);
+        logMessage("Subscribed: " + String(s_provisionTopic), "info");
         s_needsSubscribe     = false;
         s_subscribeFailLogged = false;
     } else if (!s_subscribeFailLogged) {
@@ -649,6 +802,11 @@ void uplinkTask(void* pvParameters) {
                 memmove(batch, batch + 1, sizeof(SensorReading) * 9);
                 batch[9] = reading;
             }
+        }
+
+        if (s_provisionPending) {
+            s_provisionPending = false;
+            handleProvisioningConfig(s_provisionPayload.c_str());
         }
 
         MqttCommand cmd;
@@ -825,6 +983,11 @@ void uplinkProcess() {
                     s_batch[9] = reading;
                 }
             }
+            if (s_provisionPending) {
+                s_provisionPending = false;
+                handleProvisioningConfig(s_provisionPayload.c_str());
+            }
+
             MqttCommand cmd;
             if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE)
                 handleCommand(cmd.payload);

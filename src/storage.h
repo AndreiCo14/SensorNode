@@ -31,6 +31,8 @@ struct HwConfig {
     uint16_t teleIntervalM;
     int8_t   sampleNum;
     uint16_t onTime;
+    // Set to true after a provisioning config has been successfully applied
+    bool     provisioned;
 };
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
@@ -46,6 +48,7 @@ bool loadWifiCreds(char* ssid, size_t ssidLen, char* pass, size_t passLen,
                    char* ssid2, size_t ssid2Len, char* pass2, size_t pass2Len);
 bool saveWifiCreds(const char* ssid, const char* pass,
                    const char* ssid2, const char* pass2);
+void clearWifiCreds();
 
 // ─── MQTT config ──────────────────────────────────────────────────────────────
 bool loadMqttConfig(MqttConfig& cfg);
