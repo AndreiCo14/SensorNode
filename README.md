@@ -12,7 +12,7 @@
 8. [OTA Firmware Updates](#ota-firmware-updates)
 9. [Feature Flags](#feature-flags)
 10. [Advanced Configuration](#advanced-configuration)
-11. [TODO List] (#todo-list)
+11. [TODO List](#todo-list)
 
 ---
 
@@ -462,5 +462,5 @@ After a fresh flash the device boots into AP mode as if first-time setup.
 ## TODO List
 
 - Additional sensors
-- Integration with jther services/APIs  
+- Integration with other services/APIs
 - Sleep mode for solar-powered devices
