@@ -80,6 +80,7 @@ static void handleGetState() {
 #endif
     doc["flashKB"]    = ESP.getFlashChipSize() / 1024;
     doc["ipAddress"]  = apMode ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
+    doc["debugLog"]   = getDebugLog();
 
     sendJsonDoc(200, doc);
 }

@@ -81,7 +81,7 @@ On first boot (no WiFi credentials stored) the device starts in **AP mode** imme
 | | |
 |--|--|
 | **SSID** | `AirMQ-SN-<chipId>` (e.g. `AirMQ-SN-3812940`) |
-| **Password** | `configesp` |
+| **Security** | Open (no password) |
 
 Your device should redirect you to the config page automatically (captive portal). If not, open **http://192.168.4.1** in a browser.
 
@@ -370,7 +370,7 @@ If a WS2812B LED is connected (LED pin ≠ -1), it shows device state:
 
 ### Via OTA server
 
-The device checks a version JSON at the URL configured in `platformio.ini`. If the server's build number is higher than the running firmware, it downloads and applies the update automatically.
+The device checks a version JSON at the URL baked in at compile time (`OTA_VERSION_URL`). If the server's build number is higher than the running firmware, it downloads and applies the update automatically.
 
 Trigger a check from:
 - Web UI → **Check OTA Server** button
@@ -383,6 +383,8 @@ Trigger a check from:
 ```
 
 > **Note:** on ESP8266, OTA must use HTTP (not HTTPS). BearSSL cannot hold an open WebSocket and a TLS download connection simultaneously.
+
+See [docs/ota-channels.md](docs/ota-channels.md) for details on the dev/release channel setup and the upload workflow.
 
 ---
 
@@ -422,7 +424,6 @@ Change from web UI (**Features** section → Apply → Reboot) or via MQTT (see 
 
 | Constant | Default | Description |
 |----------|---------|-------------|
-| `AP_PASSWORD` | `configesp` | WPA2 passphrase for config AP |
 | `DEFAULT_MQTT_BROKER` | `mq.airmq.cc` | MQTT broker hostname |
 | `DEFAULT_MQTT_PORT` | `18883` | MQTT port |
 | `DEFAULT_MQTT_PREFIX` | `Sensors/` | Topic prefix |

@@ -249,6 +249,11 @@ function loadState() {
         set('s-time', '—');
         set('s-ntp',  '<span class="err">not synced</span>');
       }
+      debugOn = !!d.debugLog;
+      var btn = document.getElementById('debug-btn');
+      btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');
+      btn.style.color = debugOn ? '#4caf50' : '';
+      btn.style.borderColor = debugOn ? '#4caf50' : '';
     })
     .catch(function(){set('s-wifi','<span class="err">fetch failed</span>')});
 }

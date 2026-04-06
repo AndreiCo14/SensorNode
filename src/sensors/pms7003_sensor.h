@@ -3,8 +3,14 @@
 #include "sensor_base.h"
 
 // ─── PMS7003 particulate matter sensor ───────────────────────────────────────
-// ESP8266 only: UART0 (GPIO1 TX, GPIO3 RX), GPIO15 = 5V power enable,
-// GPIO12 = inverse of GPIO15.
+// UART0 (GPIO1 TX, GPIO3 RX) for frame reception.
+// Power is controlled via the board-level 5V pin (HwConfig.pin5v).
+// Optionally, the PMS7003 SET pin can be driven via set_pin in sensorsetup.json:
+//   set_pin=-1 (default): not connected — SET floats high or is tied, 5V rail
+//                         controls the sensor entirely.
+//   set_pin=N, set_inverted=true: N drives an inverting FET → SET
+//                         (LOW on GPIO → SET=HIGH = run; HIGH → SET=LOW = sleep)
+//   set_pin=N, set_inverted=false: N drives SET directly.
 //
 // Power cycle: sensor is powered on for onTime seconds (from SystemState)
 // every teleIntervalM minutes.  Incoming frames (~1/s) are stored in a
@@ -22,11 +28,19 @@ public:
     const char* type()    const override { return "pms7003"; }
     uint8_t     msgType() const override { return 240; }
 
+    // Called by sensor_manager before begin(). pwrPin comes from HwConfig.pin5v;
+    // setPin=-1 means SET is not connected (default).
+    void setPins(int8_t pwrPin, int8_t setPin, bool setInverted);
+
 private:
     enum class State : uint8_t { IDLE, WARMING, DATA_READY };
 
     State    _state       = State::IDLE;
     uint32_t _powerOnMs   = 0;
+
+    int8_t   _pwrPin      = -1;   // 5V power enable pin (-1 = not used)
+    int8_t   _setPin      = -1;   // SET pin (-1 = not connected)
+    bool     _setInverted = true; // true = inverting FET between GPIO and SET
 
     // Ring buffer of last AVG_N valid frames
     static const uint8_t AVG_N = 10;

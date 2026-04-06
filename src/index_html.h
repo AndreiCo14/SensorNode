@@ -252,6 +252,11 @@ static const char INDEX_HTML[] PROGMEM =
   "        set('s-time', '—');\n"
   "        set('s-ntp',  '<span class=\"err\">not synced</span>');\n"
   "      }\n"
+  "      debugOn = !!d.debugLog;\n"
+  "      var btn = document.getElementById('debug-btn');\n"
+  "      btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');\n"
+  "      btn.style.color = debugOn ? '#4caf50' : '';\n"
+  "      btn.style.borderColor = debugOn ? '#4caf50' : '';\n"
   "    })\n"
   "    .catch(function(){set('s-wifi','<span class=\"err\">fetch failed</span>')});\n"
   "}\n"
@@ -671,5 +676,4 @@ static const char INDEX_HTML[] PROGMEM =
   "</script>\n"
   "</body>\n"
   "</html>\n"
-  "\n"
-;
+  "\n";

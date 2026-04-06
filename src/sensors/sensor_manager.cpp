@@ -84,6 +84,13 @@ void sensorsInit() {
         if (fullscale_pa > 0 && strcmp(type, "xdb401") == 0)
             static_cast<Xdb401Sensor*>(s)->setFullscalePa(fullscale_pa);
 
+        // PMS7003: power pin from HwConfig; SET pin optional (default -1 = not connected)
+        if (strcmp(type, "pms7003") == 0) {
+            int8_t setPin = entry["set_pin"].isNull() ? (int8_t)-1 : entry["set_pin"].as<int8_t>();
+            bool   setInv = entry["set_inverted"] | true;
+            static_cast<Pms7003Sensor*>(s)->setPins(hwCfg.pin5v, setPin, setInv);
+        }
+
         // Check for I2C address collisions before initialising
         uint8_t sAddr = s->i2cAddr();
         if (sAddr != 0) {

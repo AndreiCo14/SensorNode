@@ -3,21 +3,25 @@
 #include "../logger.h"
 #include <Arduino.h>
 
-static const int8_t   PMS_PIN_PWR        = 15;  // HIGH = sensor powered
-static const int8_t   PMS_PIN_INV        = 12;  // inverse of PIN_PWR
 static const uint16_t PMS_DEFAULT_ONTIME = 30;  // seconds
 
 // ─── Hardware control ─────────────────────────────────────────────────────────
 
+void Pms7003Sensor::setPins(int8_t pwrPin, int8_t setPin, bool setInverted) {
+    _pwrPin      = pwrPin;
+    _setPin      = setPin;
+    _setInverted = setInverted;
+}
+
 void Pms7003Sensor::powerOn() {
-    digitalWrite(PMS_PIN_INV, LOW);
-    digitalWrite(PMS_PIN_PWR, HIGH);
+    if (_setPin >= 0) digitalWrite(_setPin, _setInverted ? LOW : HIGH);
+    if (_pwrPin >= 0) digitalWrite(_pwrPin, HIGH);
     Serial.begin(9600);
 }
 
 void Pms7003Sensor::powerOff() {
-    digitalWrite(PMS_PIN_PWR, LOW);
-    digitalWrite(PMS_PIN_INV, HIGH);
+    if (_pwrPin >= 0) digitalWrite(_pwrPin, LOW);
+    if (_setPin >= 0) digitalWrite(_setPin, _setInverted ? HIGH : LOW);
 }
 
 // ─── Frame parsing ────────────────────────────────────────────────────────────
@@ -55,10 +59,8 @@ void Pms7003Sensor::parseSerial() {
 // ─── SensorBase interface ─────────────────────────────────────────────────────
 
 bool Pms7003Sensor::begin(int, int, int, int, int) {
-    pinMode(PMS_PIN_PWR, OUTPUT);
-    pinMode(PMS_PIN_INV, OUTPUT);
-    digitalWrite(PMS_PIN_PWR, LOW);
-    digitalWrite(PMS_PIN_INV, HIGH);
+    if (_pwrPin >= 0) { pinMode(_pwrPin, OUTPUT); digitalWrite(_pwrPin, LOW); }
+    if (_setPin >= 0) { pinMode(_setPin, OUTPUT); digitalWrite(_setPin, _setInverted ? HIGH : LOW); }
     _state    = State::IDLE;
     _rbHead   = 0;
     _rbCount  = 0;
