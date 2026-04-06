@@ -1,6 +1,6 @@
 .pio
 .vscode/
-scripts/
+#scripts/
 
 *.bak
 

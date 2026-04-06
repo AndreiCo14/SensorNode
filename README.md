@@ -311,7 +311,7 @@ Send a JSON object to `Sensors/<chipId>/cmd`. Multiple keys can be combined in o
 |-----|------|-------------|
 | `teleIntervalM` | integer | Telemetry and sensor publish interval in minutes |
 | `sampleNum` | integer | Readings to batch before publishing (1 = immediate) |
-| `onTime` | integer | Minimum active time in ms (≥ 30) |
+| `onTime` | integer | Minimum active time in S (≥ 30) |
 
 **Debug:**
 
