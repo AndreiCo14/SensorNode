@@ -256,6 +256,7 @@ bool loadHwConfig(HwConfig& cfg) {
     cfg.teleIntervalM = DEFAULT_TELE_INTERVAL_M;
     cfg.sampleNum    = DEFAULT_SAMPLE_NUM;
     cfg.onTime       = 30;
+    cfg.deepSleep    = false;
 
     JsonDocument doc;
     if (!readJson(HW_CONF_PATH, doc)) return false;
@@ -274,6 +275,7 @@ bool loadHwConfig(HwConfig& cfg) {
         cfg.onTime = doc["onTime"].as<uint16_t>();
         if (cfg.onTime < 30) cfg.onTime = 30;
     }
+    cfg.deepSleep   = doc["deepSleep"]   | false;
     cfg.provisioned = doc["provisioned"] | false;
     return true;
 }
@@ -291,6 +293,7 @@ bool saveHwConfig(const HwConfig& cfg) {
     doc["teleIntervalM"] = cfg.teleIntervalM;
     doc["sampleNum"]     = cfg.sampleNum;
     doc["onTime"]        = cfg.onTime;
+    doc["deepSleep"]     = cfg.deepSleep;
     doc["provisioned"]   = cfg.provisioned;
     return writeJson(HW_CONF_PATH, doc);
 }

@@ -8,6 +8,7 @@
 #include "platform.h"
 #include "queues.h"
 #include "sensors/sensor_manager.h"
+#include "deep_sleep.h"
 #include <ArduinoJson.h>
 #include <espMqttClient.h>
 #include <DNSServer.h>
@@ -22,10 +23,13 @@ static espMqttClientSecure* mqttSecure = nullptr;
 // Deferred subscription: subscribe() is called from the main loop rather than
 // directly inside the CONNACK callback, where the library outbox state may not
 // be fully settled yet (causing spurious subscribe() failures).
-static bool s_needsSubscribe     = false;
-static bool s_publishStartSent   = false;
+static bool s_needsSubscribe      = false;
+static bool s_publishStartSent    = false;
 static bool s_subscribeFailLogged = false;  // suppress log spam on repeated failures
-static char s_cmdTopic[64]       = {};
+static char s_cmdTopic[64]        = {};
+static bool s_deepSleepMode       = false;  // enter sleep after each publish cycle
+static bool s_maintenanceMode     = false;  // inhibit sleep; set by maintenance:true in Start reply
+static bool s_sensorsStarted      = false;  // sensors have been enabled this boot
 #define MQTT_CALL(method, ...) \
     do { if (mqttSecure) mqttSecure->method(__VA_ARGS__); \
          else if (mqttPlain) mqttPlain->method(__VA_ARGS__); } while(0)
@@ -497,12 +501,18 @@ static void handleCommand(const char* payload) {
         needsSave = true;
     }
 
+    if (!doc["deepSleep"].isNull()) {
+        s_deepSleepMode = doc["deepSleep"].as<bool>();
+        needsSave = true;
+    }
+
     if (needsSave) {
         HwConfig hw;
         loadHwConfig(hw);
         hw.teleIntervalM = STATE_GET(teleIntervalM);
         hw.sampleNum     = STATE_GET(sampleNum);
         hw.onTime        = STATE_GET(onTime);
+        hw.deepSleep     = s_deepSleepMode;
         saveHwConfig(hw);
         logMessage("hwconfig saved", "info");
     }
@@ -511,6 +521,22 @@ static void handleCommand(const char* payload) {
         bool en = doc["debugLog"].as<bool>();
         setDebugLog(en);
         logMessage(String("debugLog -> ") + (en ? "on" : "off"), "info");
+    }
+
+    if (!doc["deepSleep"].isNull())
+        logMessage(String("deepSleep -> ") + (s_deepSleepMode ? "on" : "off"), "info");
+
+    // maintenance:true  — pause deep sleep cycle, stay online (set in Start reply)
+    // maintenance:false — resume deep sleep cycle (sent as subsequent cmd)
+    if (!doc["maintenance"].isNull()) {
+        bool m = doc["maintenance"].as<bool>();
+        if (m) {
+            s_maintenanceMode = true;
+            logMessage("Maintenance mode — deep sleep paused", "info");
+        } else {
+            s_maintenanceMode = false;
+            logMessage("Maintenance ended — deep sleep cycle resuming", "info");
+        }
     }
 
     if (doc["ota"].is<const char*>()) {
@@ -747,6 +773,7 @@ static void tryDeferredSubscribe() {
 
 void uplinkTask(void* pvParameters) {
     loadMqttConfig(mqttCfgData);
+    { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; }
 
     snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
              (unsigned long)STATE_GET(chipId));
@@ -814,8 +841,17 @@ void uplinkTask(void* pvParameters) {
             handleCommand(cmd.payload);
 
         // Enable sensors after startup command window expires
-        if (s_startupWindowMs && millis() - s_startupWindowMs >= STARTUP_CMD_WINDOW_MS)
-            sensorsEnable();
+        if (s_startupWindowMs && !s_sensorsStarted &&
+            millis() - s_startupWindowMs >= STARTUP_CMD_WINDOW_MS) {
+            s_sensorsStarted = true;
+            if (s_deepSleepMode && !s_maintenanceMode) {
+                logMessage("Startup window: deep sleep mode — onTime=" + String(STATE_GET(onTime)) + "s, interval=" + String(STATE_GET(teleIntervalM)) + "m", "debug");
+                sensorsEnableDeepSleep();
+            } else {
+                logMessage(String("Startup window: normal mode") + (s_deepSleepMode ? " (maintenance override)" : ""), "debug");
+                sensorsEnable();
+            }
+        }
 
         int8_t sn = STATE_GET(sampleNum);
         if (batchCount >= sn && batchCount > 0) {
@@ -826,6 +862,14 @@ void uplinkTask(void* pvParameters) {
             sendTelemetry();
             batchCount = 0;
             lastTele = millis() / 1000;
+
+            if (s_deepSleepMode && !s_maintenanceMode) {
+                uint32_t sleepSec = (uint32_t)STATE_GET(teleIntervalM) * 60UL;
+                logMessage("Deep sleep trigger: flushing MQTT, then sleeping " + String(sleepSec) + "s", "debug");
+                // Flush MQTT outbox before sleeping
+                for (int i = 0; i < 30; i++) { MQTT_LOOP(); vTaskDelay(pdMS_TO_TICKS(10)); }
+                enterDeepSleep(sleepSec);
+            }
         }
 
         uint32_t now     = millis() / 1000;
@@ -875,6 +919,7 @@ void uplinkTask(void* pvParameters) {
 
 void uplinkInit() {
     loadMqttConfig(mqttCfgData);
+    { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; }
     snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
              (unsigned long)STATE_GET(chipId));
     loadWifiCreds(s_ssid, sizeof(s_ssid), s_pass, sizeof(s_pass),
@@ -993,8 +1038,17 @@ void uplinkProcess() {
                 handleCommand(cmd.payload);
 
             // Enable sensors after startup command window expires
-            if (s_startupWindowMs && millis() - s_startupWindowMs >= STARTUP_CMD_WINDOW_MS)
-                sensorsEnable();
+            if (s_startupWindowMs && !s_sensorsStarted &&
+                millis() - s_startupWindowMs >= STARTUP_CMD_WINDOW_MS) {
+                s_sensorsStarted = true;
+                if (s_deepSleepMode && !s_maintenanceMode) {
+                    logMessage("Startup window: deep sleep mode — onTime=" + String(STATE_GET(onTime)) + "s, interval=" + String(STATE_GET(teleIntervalM)) + "m", "debug");
+                    sensorsEnableDeepSleep();
+                } else {
+                    logMessage(String("Startup window: normal mode") + (s_deepSleepMode ? " (maintenance override)" : ""), "debug");
+                    sensorsEnable();
+                }
+            }
 
             int8_t sn = STATE_GET(sampleNum);
             if (s_batchCount >= sn && s_batchCount > 0) {
@@ -1005,6 +1059,14 @@ void uplinkProcess() {
                 sendTelemetry();
                 s_batchCount = 0;
                 s_lastTele   = millis() / 1000;
+
+                if (s_deepSleepMode && !s_maintenanceMode) {
+                    uint32_t sleepSec = (uint32_t)STATE_GET(teleIntervalM) * 60UL;
+                    logMessage("Deep sleep trigger: flushing MQTT, then sleeping " + String(sleepSec) + "s", "debug");
+                    MQTT_LOOP();
+                    delay(200);
+                    enterDeepSleep(sleepSec);
+                }
             }
 
             uint32_t now     = millis() / 1000;

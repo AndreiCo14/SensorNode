@@ -155,6 +155,20 @@ void sensorsEnable() {
     logMessage("Sensors enabled — awaiting first cycle", "info");
 }
 
+void sensorsEnableDeepSleep() {
+    if (s_enabled) return;
+    s_enabled = true;
+    // Schedule first read at (onTime + 5) seconds from now so PMS7003 has
+    // exactly onTime seconds to warm up before doSensorRead() fires.
+    // We backdate s_lastRead so the interval timer expires at the right moment.
+    uint16_t onTimeSec  = STATE_GET(onTime);
+    uint32_t intervalMs = (uint32_t)STATE_GET(teleIntervalM) * 60000UL;
+    if (intervalMs == 0) intervalMs = 60000UL;
+    uint32_t readDelayMs = ((uint32_t)onTimeSec + 5UL) * 1000UL;
+    s_lastRead = millis() - intervalMs + readDelayMs;
+    logMessage("Sensors enabled (deep sleep — read in " + String(onTimeSec + 5) + "s)", "info");
+}
+
 static void doSensorRead() {
     s_lastRead = millis();
     uint32_t chipId = STATE_GET(chipId);
