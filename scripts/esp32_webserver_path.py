@@ -3,13 +3,10 @@ import os
 
 print("=== esp32_webserver_path.py: running ===")
 
-# $FRAMEWORK_DIR is the SCons variable PlatformIO sets to the Arduino framework root.
-# Use env.subst() rather than get_package_dir() — more reliable cross-platform.
+# env.subst("$FRAMEWORK_DIR") may not be set yet in pre: scripts;
+# fall back to the PlatformIO package API.
 framework_dir = env.subst("$FRAMEWORK_DIR")
-
-# Sanity-check: subst() returns the literal string when the variable is undefined
 if not framework_dir or framework_dir.startswith("$"):
-    # Fallback: PlatformIO Python API
     try:
         framework_dir = env.PioPlatform().get_package_dir("framework-arduinoespressif32")
         print(f"  Using PlatformIO API: {framework_dir}")
@@ -22,11 +19,16 @@ else:
 if framework_dir:
     webserver_src = os.path.join(framework_dir, "libraries", "WebServer", "src")
     if os.path.isdir(webserver_src):
-        env.Append(CPPPATH=[webserver_src])
-        print(f"  Added to CPPPATH: {webserver_src}")
+        # Use CCFLAGS, NOT CPPPATH.
+        # The espressif32 platform builder replaces CPPPATH after pre: scripts run,
+        # so CPPPATH additions are silently discarded.  CCFLAGS is never replaced,
+        # so the -I flag survives into the actual compiler invocation.
+        flag = "-I" + webserver_src.replace("\\", "/")
+        env.Append(CCFLAGS=[flag])
+        print(f"  Added to CCFLAGS: {flag}")
     else:
         print(f"  WARNING: directory not found: {webserver_src}")
 else:
-    print("  ERROR: could not determine FRAMEWORK_DIR")
+    print("  ERROR: could not determine framework_dir")
 
 print("=== esp32_webserver_path.py: done ===")
