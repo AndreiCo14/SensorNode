@@ -1,7 +1,6 @@
 #include "deep_sleep.h"
 #include "logger.h"
 #include "queues.h"
-#include "platform.h"
 #include <Arduino.h>
 #ifdef ESP8266
 #  include <ESP8266WiFi.h>
