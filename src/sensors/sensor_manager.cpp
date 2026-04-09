@@ -28,8 +28,7 @@ uint8_t sensorsActiveCount() { return activeCount; }
 
 void sensorGetLastValues(JsonDocument& out) {
     for (uint8_t i = 0; i < sensorCount; i++) {
-        if (!sensors[i] || !sensors[i]->isReady()) continue;
-        if (s_lastData[i][0] == '\0') continue;
+        if (!sensors[i] || s_lastData[i][0] == '\0') continue;
         JsonDocument inner;
         if (deserializeJson(inner, s_lastData[i]) == DeserializationError::Ok)
             out[sensors[i]->type()] = inner;

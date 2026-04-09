@@ -236,6 +236,7 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
 </main>
 <script>
 var MAX_LOG = 200;
+var bootEpoch = null; // ms — set when NTP is synced
 
 // ── State ──────────────────────────────────────────────────────────────────────
 function loadState() {
@@ -262,9 +263,12 @@ function loadState() {
         var dt = new Date(d.epochTime*1000);
         set('s-time', pad(dt.getHours())+':'+pad(dt.getMinutes())+':'+pad(dt.getSeconds()));
         set('s-ntp',  '<span class="ok">synced</span>');
+        if (d.millisNow !== undefined)
+          bootEpoch = d.epochTime * 1000 - d.millisNow;
       } else {
         set('s-time', '—');
         set('s-ntp',  '<span class="err">not synced</span>');
+        bootEpoch = null;
       }
       debugOn = !!d.debugLog;
       var btn = document.getElementById('debug-btn');
@@ -392,9 +396,11 @@ var SENSOR_TYPES = [
 ];
 
 var sensorSetupData = [];
-var UNITS = {temp:'°C',hum:'%',press:'hPa',co2:'ppm',tvoc:'ppb',
-             pm1:'µg/m³',pm25:'µg/m³',pm10:'µg/m³',press_pa:'Pa',
-             voc_index:'',nox_index:'',distance:'mm'};
+var UNITS = {
+  Temp:'°C', Hum:'%', Press:'hPa',
+  CO2:'ppm', VOC:'idx', NOx:'idx',
+  PMS1:'µg/m³', PMS25:'µg/m³', PMS10:'µg/m³'
+};
 
 function buildSensorCard(st, entry, values) {
   var card = document.createElement('div');
@@ -658,10 +664,16 @@ function connectWs() {
     var log = document.getElementById('log');
     var row = document.createElement('div');
     row.className = 'log-entry log-'+(d.l||'info');
-    var ts = Math.floor((d.t||0)/1000);
-    var h=Math.floor(ts/3600), m=Math.floor((ts%3600)/60), s=ts%60;
+    var tsStr;
+    if (bootEpoch !== null && d.t) {
+      var abs = new Date(bootEpoch + d.t);
+      tsStr = pad(abs.getHours())+':'+pad(abs.getMinutes())+':'+pad(abs.getSeconds());
+    } else {
+      var ts = Math.floor((d.t||0)/1000);
+      tsStr = pad(Math.floor(ts/3600))+':'+pad(Math.floor((ts%3600)/60))+':'+pad(ts%60);
+    }
     if(!d.l) console.warn('[WS] msg without l key:', evt.data);
-    row.innerHTML = '<span class="log-ts">'+pad(h)+':'+pad(m)+':'+pad(s)+'</span>'
+    row.innerHTML = '<span class="log-ts">'+tsStr+'</span>'
                   + '<span class="warn">['+(d.l||'info')+']</span> '+escHtml(d.m||'');
     log.appendChild(row);
     while(log.children.length>MAX_LOG) log.removeChild(log.firstChild);

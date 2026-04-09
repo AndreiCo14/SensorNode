@@ -72,6 +72,7 @@ static void handleGetState() {
 
     time_t epoch = time(NULL);
     doc["epochTime"]  = (uint32_t)epoch;
+    doc["millisNow"]  = millis();
     doc["ntpSynced"]  = (epoch > 1000000000UL);
     doc["lfsReady"]   = lfsReady;
 #ifdef ESP8266

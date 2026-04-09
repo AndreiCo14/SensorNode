@@ -442,10 +442,23 @@ static void handleProvisioningConfig(const char* payload) {
 
     hw.provisioned = true;
     saveHwConfig(hw);
-    if (hwChanged)
-        logMessage("Provision: hwconfig applied", "info");
-    else
+    if (hwChanged) {
+        String hwLog = "Provision: hwconfig applied —";
+        if (!doc["teleIntervalM"].isNull()) hwLog += " teleIntervalM=" + String(hw.teleIntervalM);
+        if (!doc["sampleNum"].isNull())     hwLog += " sampleNum=" + String(hw.sampleNum);
+        if (!doc["onTime"].isNull())        hwLog += " onTime=" + String(hw.onTime);
+        if (!doc["interval"].isNull())      hwLog += " interval=" + String(hw.intervalSec);
+        if (!doc["i2c_sda"].isNull())       hwLog += " sda=" + String(hw.i2c_sda);
+        if (!doc["i2c_scl"].isNull())       hwLog += " scl=" + String(hw.i2c_scl);
+        if (!doc["uart_rx"].isNull())       hwLog += " rx=" + String(hw.uart_rx);
+        if (!doc["uart_tx"].isNull())       hwLog += " tx=" + String(hw.uart_tx);
+        if (!doc["onewire"].isNull())       hwLog += " ow=" + String(hw.onewire);
+        if (!doc["led_pin"].isNull())       hwLog += " led=" + String(hw.led_pin);
+        if (!doc["5v_pin"].isNull())        hwLog += " 5v=" + String(hw.pin5v);
+        logMessage(hwLog, "info");
+    } else {
         logMessage("Provision: no hw fields changed, provisioned flag set", "info");
+    }
 
     if (doc["sensors"].is<JsonArray>()) {
         if (xSemaphoreTake(sensorSetupMutex, pdMS_TO_TICKS(1000))) {
@@ -453,7 +466,13 @@ static void handleProvisioningConfig(const char* payload) {
             xSemaphoreGive(sensorSetupMutex);
         }
         saveSensorSetup();
-        logMessage("Provision: sensor setup applied", "info");
+        String sLog = "Provision: sensors —";
+        for (JsonObject s : doc["sensors"].as<JsonArray>()) {
+            sLog += " [" + String(s["type"] | "?");
+            sLog += s["enabled"] | false ? " ON" : " off";
+            sLog += "]";
+        }
+        logMessage(sLog, "info");
     }
 
     if (doc["mqtt"].is<JsonObject>()) {
@@ -465,7 +484,7 @@ static void handleProvisioningConfig(const char* payload) {
         if (!mqtt["prefix"].isNull()) strncpy(cfg.prefix, mqtt["prefix"].as<const char*>(), sizeof(cfg.prefix) - 1);
         if (!mqtt["tls"].isNull())    cfg.tls    = mqtt["tls"].as<bool>();
         saveMqttConfig(cfg);
-        logMessage("Provision: MQTT config applied (takes effect on reconnect)", "info");
+        logMessage(String("Provision: MQTT broker=") + cfg.broker + " port=" + cfg.port + " tls=" + (cfg.tls?"yes":"no") + " (reconnect to apply)", "info");
     }
 }
 
