@@ -80,6 +80,15 @@ static void buildTopic(char* buf, size_t bufLen, const char* suffix) {
              suffix);
 }
 
+static void publishSleepStatus(uint32_t sleepSec) {
+    char topic[64];
+    char payload[40];
+    buildTopic(topic, sizeof(topic), TOPIC_STATUS_SUFFIX);
+    snprintf(payload, sizeof(payload), "{\"sleepTime\":%lu}", (unsigned long)sleepSec);
+    MQTT_PUBLISH(topic, 0, false, payload);
+    logMessage("MQTT → " + String(topic) + " " + payload, "info");
+}
+
 // ─── Epoch time ───────────────────────────────────────────────────────────────
 
 static uint32_t getEpochTime() {
@@ -866,6 +875,7 @@ void uplinkTask(void* pvParameters) {
             if (s_deepSleepMode && !s_maintenanceMode) {
                 uint32_t sleepSec = (uint32_t)STATE_GET(teleIntervalM) * 60UL;
                 logMessage("Deep sleep trigger: flushing MQTT, then sleeping " + String(sleepSec) + "s", "debug");
+                publishSleepStatus(sleepSec);
                 // Flush MQTT outbox before sleeping
                 for (int i = 0; i < 30; i++) { MQTT_LOOP(); vTaskDelay(pdMS_TO_TICKS(10)); }
                 enterDeepSleep(sleepSec);
@@ -1063,6 +1073,7 @@ void uplinkProcess() {
                 if (s_deepSleepMode && !s_maintenanceMode) {
                     uint32_t sleepSec = (uint32_t)STATE_GET(teleIntervalM) * 60UL;
                     logMessage("Deep sleep trigger: flushing MQTT, then sleeping " + String(sleepSec) + "s", "debug");
+                    publishSleepStatus(sleepSec);
                     MQTT_LOOP();
                     delay(200);
                     enterDeepSleep(sleepSec);
