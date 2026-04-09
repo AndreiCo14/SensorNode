@@ -1,4 +1,5 @@
 #include "webserver.h"
+#include "sensors/sensor_manager.h"
 #include "config.h"
 #include "settings.h"
 #include "logger.h"
@@ -291,6 +292,14 @@ static void handlePostSensorSetup() {
     }
 }
 
+// ─── GET /api/sensors/values ─────────────────────────────────────────────────
+
+static void handleGetSensorValues() {
+    JsonDocument doc;
+    sensorGetLastValues(doc);
+    sendJsonDoc(200, doc);
+}
+
 // ─── POST /api/cmd ────────────────────────────────────────────────────────────
 
 static void handlePostCmd() {
@@ -494,8 +503,9 @@ static void webServerSetup() {
     httpServer.on("/api/hw/config",  HTTP_POST, handlePostHwConfig);
 
     // Sensor setup
-    httpServer.on("/api/sensors/setup", HTTP_GET,  handleGetSensorSetup);
-    httpServer.on("/api/sensors/setup", HTTP_POST, handlePostSensorSetup);
+    httpServer.on("/api/sensors/setup",  HTTP_GET,  handleGetSensorSetup);
+    httpServer.on("/api/sensors/setup",  HTTP_POST, handlePostSensorSetup);
+    httpServer.on("/api/sensors/values", HTTP_GET,  handleGetSensorValues);
     httpServer.on("/api/config/export", HTTP_GET,  handleGetConfigExport);
     httpServer.on("/api/config/reset",  HTTP_POST, handleConfigReset);
 

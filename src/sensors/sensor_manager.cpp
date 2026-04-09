@@ -22,8 +22,19 @@ static SensorBase* sensors[MAX_SENSORS] = {};
 static uint8_t     sensorCount = 0;
 static uint8_t     activeCount = 0;
 static HwConfig    hwCfg;
+static char        s_lastData[MAX_SENSORS][SENSOR_DATA_MAX];
 
 uint8_t sensorsActiveCount() { return activeCount; }
+
+void sensorGetLastValues(JsonDocument& out) {
+    for (uint8_t i = 0; i < sensorCount; i++) {
+        if (!sensors[i] || !sensors[i]->isReady()) continue;
+        if (s_lastData[i][0] == '\0') continue;
+        JsonDocument inner;
+        if (deserializeJson(inner, s_lastData[i]) == DeserializationError::Ok)
+            out[sensors[i]->type()] = inner;
+    }
+}
 
 // ─── Find or create a sensor instance of the given type ──────────────────────
 
@@ -186,6 +197,7 @@ static void doSensorRead() {
         SensorReading r = {};
         r.deviceId = chipId;
         if (!sensors[i]->read(r)) continue;
+        strncpy(s_lastData[i], r.data, SENSOR_DATA_MAX - 1);
 
         // r.data = {"k":v,...} — strip braces and append inner content
         size_t dlen = strlen(r.data);

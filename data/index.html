@@ -38,13 +38,22 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
 .btn-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .msg{margin-top:6px;font-size:11px;min-height:14px}
 /* Sensor cards */
-#sensor-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
+#sensor-cards,#sensor-cards-other{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
 .sensor-card{border:1px solid #2a2a2a;border-radius:3px;padding:5px 7px;background:#141414}
 .sensor-card .sc-head{display:flex;align-items:center;gap:6px}
 .sensor-card .sc-type{color:#7eb8f7;font-size:12px;flex:1}
 .sensor-card .sc-fields{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
 .sensor-card .sc-field{display:flex;align-items:center;gap:4px;font-size:11px;color:#888}
 .sensor-card .sc-field input{width:56px;background:#111;border:1px solid #333;color:#ddd;padding:2px 4px;border-radius:2px;font-size:11px}
+.sc-values{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;padding-top:4px;border-top:1px solid #222}
+.sc-val{background:#0d180d;border:1px solid #1e3a1e;border-radius:2px;padding:1px 6px;font-size:11px}
+.sc-val-k{color:#555}
+.sc-val-v{color:#4caf50;margin-left:3px}
+#other-sensors-details{margin-top:8px}
+#other-sensors-details summary{cursor:pointer;font-size:10px;color:#555;text-transform:uppercase;letter-spacing:1px;padding:3px 0;user-select:none}
+#other-sensors-details summary:hover{color:#888}
+#other-sensors-details[open] summary{color:#888}
+#sensor-cards-other{margin-top:6px}
 /* Log */
 #log{height:240px;overflow-y:auto;background:#0d0d0d;border:1px solid #222;padding:6px;border-radius:2px;display:flex;flex-direction:column}
 .log-entry{padding:1px 0;white-space:pre-wrap;word-break:break-all;line-height:1.5}
@@ -149,10 +158,14 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
     <div class="msg" id="hw-msg"></div>
   </section>
 
-  <!-- Sensor Setup -->
+  <!-- Sensors -->
   <section id="sensorsetup-section" class="draggable-section" draggable="true">
-    <h2>Sensor Setup</h2>
+    <h2>Sensors</h2>
     <div id="sensor-cards"></div>
+    <details id="other-sensors-details">
+      <summary>Other sensors</summary>
+      <div id="sensor-cards-other"></div>
+    </details>
     <div class="btn-row">
       <button class="btn" onclick="saveSensorSetup()">Save</button>
       <a class="btn" href="/api/config/export">Download Config</a>
@@ -375,46 +388,77 @@ var SENSOR_TYPES = [
 ];
 
 var sensorSetupData = [];
+var UNITS = {temp:'°C',hum:'%',press:'hPa',co2:'ppm',tvoc:'ppb',
+             pm1:'µg/m³',pm25:'µg/m³',pm10:'µg/m³',press_pa:'Pa',
+             voc_index:'',nox_index:'',distance:'mm'};
 
-function renderSensorCards(data) {
-  var container = document.getElementById('sensor-cards');
-  container.innerHTML = '';
+function buildSensorCard(st, entry, values) {
+  var card = document.createElement('div');
+  card.className = 'sensor-card';
+  var headHtml = '<div class="sc-head">'
+    +'<input type="checkbox" data-type="'+st.type+'" '+(entry.enabled?'checked':'')+'>'
+    +'<span class="sc-type">'+st.label+'</span></div>';
+  var fieldsHtml = '<div class="sc-fields">';
+  if (st.fixedAddr !== undefined) {
+    fieldsHtml += '<span style="color:#555;font-size:10px">0x'+st.fixedAddr.toString(16)+'</span>';
+  }
+  st.fields.forEach(function(f){
+    var val = entry[f.key] !== undefined ? entry[f.key] : f.def;
+    if (f.fmt === 'num') {
+      var dispVal = f.div ? val / f.div : val;
+      fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
+        +'<input type="number" data-type="'+st.type+'" data-key="'+f.key+'" data-fmt="num"'+(f.div?' data-div="'+f.div+'"':'')+' value="'+dispVal+'" step="any" style="width:64px"></div>';
+    } else {
+      var hexVal = '0x' + val.toString(16);
+      fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
+        +'<input type="text" data-type="'+st.type+'" data-key="'+f.key+'" value="'+hexVal+'" style="width:52px" oninput="updateHexSpan(this)">'
+        +'<span style="color:#555;font-size:10px">('+val+')</span></div>';
+    }
+  });
+  fieldsHtml += '</div>';
+  var valHtml = '';
+  if (entry.enabled && values && values[st.type]) {
+    var v = values[st.type];
+    var items = Object.keys(v).map(function(k){
+      var u = UNITS[k] !== undefined ? UNITS[k] : '';
+      var n = (typeof v[k] === 'number') ? (Math.round(v[k]*10)/10) : v[k];
+      return '<span class="sc-val"><span class="sc-val-k">'+k+'</span>'
+           + '<span class="sc-val-v">'+n+(u?'&thinsp;'+u:'')+'</span></span>';
+    }).join('');
+    if (items) valHtml = '<div class="sc-values">'+items+'</div>';
+  }
+  card.innerHTML = headHtml + fieldsHtml + valHtml;
+  return card;
+}
+
+function renderSensorCards(data, values) {
+  var active   = document.getElementById('sensor-cards');
+  var other    = document.getElementById('sensor-cards-other');
+  var details  = document.getElementById('other-sensors-details');
+  active.innerHTML = '';
+  other.innerHTML  = '';
+  var hasOther = false;
   SENSOR_TYPES.forEach(function(st) {
     if (st.hidden) return;
     var entry = data.find(function(e){return e.type===st.type}) || {type:st.type,enabled:false};
-    var card = document.createElement('div');
-    card.className = 'sensor-card';
-    var headHtml = '<div class="sc-head">'
-      +'<input type="checkbox" data-type="'+st.type+'" '+(entry.enabled?'checked':'')+'>'
-      +'<span class="sc-type">'+st.label+'</span></div>';
-    var fieldsHtml = '<div class="sc-fields">';
-    if (st.fixedAddr !== undefined) {
-      fieldsHtml += '<span style="color:#555;font-size:10px">0x'+st.fixedAddr.toString(16)+'</span>';
+    var card = buildSensorCard(st, entry, values || {});
+    if (entry.enabled) {
+      active.appendChild(card);
+    } else {
+      other.appendChild(card);
+      hasOther = true;
     }
-    st.fields.forEach(function(f){
-      var val = entry[f.key] !== undefined ? entry[f.key] : f.def;
-      if (f.fmt === 'num') {
-        var dispVal = f.div ? val / f.div : val;
-        fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
-          +'<input type="number" data-type="'+st.type+'" data-key="'+f.key+'" data-fmt="num"'+(f.div?' data-div="'+f.div+'"':'')+' value="'+dispVal+'" step="any" style="width:64px"></div>';
-      } else {
-        var hexVal = '0x' + val.toString(16);
-        fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
-          +'<input type="text" data-type="'+st.type+'" data-key="'+f.key+'" value="'+hexVal+'" style="width:52px" oninput="updateHexSpan(this)">'
-          +'<span style="color:#555;font-size:10px">('+val+')</span></div>';
-      }
-    });
-    fieldsHtml += '</div>';
-    card.innerHTML = headHtml + fieldsHtml;
-    container.appendChild(card);
   });
+  details.style.display = hasOther ? '' : 'none';
 }
 
 function loadSensorSetup() {
-  fetch('/api/sensors/setup').then(function(r){return r.json()}).then(function(d){
+  var setupP  = fetch('/api/sensors/setup').then(function(r){return r.json()});
+  var valuesP = fetch('/api/sensors/values').then(function(r){return r.json()}).catch(function(){return {};});
+  setupP.then(function(d){
     sensorSetupData = Array.isArray(d) ? d : [];
-    renderSensorCards(sensorSetupData);
-  }).catch(function(){renderSensorCards([])});
+    valuesP.then(function(v){ renderSensorCards(sensorSetupData, v); });
+  }).catch(function(){renderSensorCards([],{})});
 }
 
 function saveSensorSetup() {
@@ -455,7 +499,10 @@ function saveSensorSetup() {
   }
   fetch('/api/sensors/setup', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(result)})
     .then(function(r){return r.json()})
-    .then(function(d){showMsg('sensorsetup-msg', d.ok ? 'Saved.' : ('Error: '+d.error), d.ok)})
+    .then(function(d){
+      showMsg('sensorsetup-msg', d.ok ? 'Saved.' : ('Error: '+d.error), d.ok);
+      if (d.ok) { sensorSetupData = result; renderSensorCards(result, {}); }
+    })
     .catch(function(){showMsg('sensorsetup-msg','Request failed',false)});
 }
 

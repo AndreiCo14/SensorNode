@@ -22,6 +22,9 @@ void sensorsEnableDeepSleep();
 // Number of sensors that successfully initialized
 uint8_t sensorsActiveCount();
 
+// Fill doc with last known values per sensor type: {"bme280":{"temp":21.5,...},...}
+void sensorGetLastValues(JsonDocument& out);
+
 #ifdef ESP8266
 void sensorProcess();
 #endif
