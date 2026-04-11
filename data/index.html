@@ -273,6 +273,33 @@ function loadState() {
       btn.style.borderColor = debugOn ? '#4caf50' : '';
     })
     .catch(function(){set('s-wifi','<span class="err">fetch failed</span>')});
+  loadSensorValues();
+}
+
+function loadSensorValues() {
+  fetch('/api/sensors/values')
+    .then(function(r){return r.json()})
+    .then(function(v){
+      SENSOR_TYPES.forEach(function(st){
+        if (st.hidden) return;
+        var cb = document.querySelector('input[type=checkbox][data-type="'+st.type+'"]');
+        if (!cb || !cb.checked) return;
+        var card = cb.closest('.sensor-card');
+        if (!card) return;
+        var existing = card.querySelector('.sc-values');
+        var vals = v[st.type];
+        if (!vals) { if (existing) existing.remove(); return; }
+        var items = Object.keys(vals).map(function(k){
+          var u = UNITS[k] !== undefined ? UNITS[k] : '';
+          var n = (typeof vals[k] === 'number') ? (Math.round(vals[k]*10)/10) : vals[k];
+          return '<span class="sc-val"><span class="sc-val-k">'+k+'</span>'
+               + '<span class="sc-val-v">'+n+(u?'&thinsp;'+u:'')+'</span></span>';
+        }).join('');
+        if (existing) existing.innerHTML = items;
+        else if (items) card.insertAdjacentHTML('beforeend','<div class="sc-values">'+items+'</div>');
+      });
+    })
+    .catch(function(){});
 }
 
 function set(id, html) {

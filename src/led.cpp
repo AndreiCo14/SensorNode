@@ -89,6 +89,12 @@ void ledUpdate() {
             lastUpdate = now;
             break;
 
+        case LED_OTA:
+            // Cyan solid — OTA update in progress
+            setColor(0, 12, 12);
+            lastUpdate = now;
+            break;
+
         case LED_ERROR:
             // Red solid
             setColor(20, 0, 0);

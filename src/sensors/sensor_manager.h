@@ -11,6 +11,10 @@ void sensorTask(void* pvParameters);
 // Called from main after storage init to build the sensor list
 void sensorsInit();
 
+// Free existing sensor instances, re-run sensorsInit(), and re-enable
+// measurement cycles. Safe to call at runtime after sensor config changes.
+void sensorsReinit();
+
 // Enable measurement cycles; call after MQTT startup handshake completes
 void sensorsEnable();
 

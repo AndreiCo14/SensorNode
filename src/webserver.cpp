@@ -1,5 +1,6 @@
 #include "webserver.h"
 #include "sensors/sensor_manager.h"
+#include "led.h"
 #include "config.h"
 #include "settings.h"
 #include "logger.h"
@@ -288,6 +289,7 @@ static void handlePostSensorSetup() {
         if (!saveSensorSetup()) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
         sendJson(200, "{\"ok\":true}");
         logMessage("Sensor setup updated via web", "info");
+        sensorsReinit();
     } else {
         sendJson(503, "{\"error\":\"busy\"}");
     }
@@ -320,6 +322,8 @@ static bool otaBeginOk = false;
 static void handleOtaUpload() {
     HTTPUpload& upload = httpServer.upload();
     if (upload.status == UPLOAD_FILE_START) {
+        ledSetState(LED_OTA);
+        ledUpdate();  // push cyan to hardware immediately
         otaBeginOk = OTA_BEGIN(upload.contentLength);
         if (otaBeginOk) {
             logMessage("OTA upload: " + upload.filename, "info");

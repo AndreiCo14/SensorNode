@@ -116,6 +116,7 @@ void setup() {
 
     // ── Init sensors ──
     sensorsInit();
+    sensorsEnable();  // start immediately; MQTT connect is not required
 
     // ── NTP (best-effort; syncs after WiFi connects) ──
     configTzTime(MYTZ, "time.google.com", "pool.ntp.org");

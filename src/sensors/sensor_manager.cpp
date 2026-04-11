@@ -179,6 +179,19 @@ void sensorsEnableDeepSleep() {
     logMessage("Sensors enabled (deep sleep — read in " + String(onTimeSec + 5) + "s)", "info");
 }
 
+void sensorsReinit() {
+    s_enabled = false;
+    vTaskDelay(pdMS_TO_TICKS(20));  // let sensorTask finish current tick
+    for (uint8_t i = 0; i < sensorCount; i++) {
+        delete sensors[i];
+        sensors[i] = nullptr;
+    }
+    memset(s_lastData, 0, sizeof(s_lastData));
+    sensorsInit();
+    s_lastRead = millis();
+    s_enabled  = true;
+}
+
 static void doSensorRead() {
     s_lastRead = millis();
     uint32_t chipId = STATE_GET(chipId);

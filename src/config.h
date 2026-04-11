@@ -22,6 +22,15 @@
 #define AP_WINDOW_MS                180000UL
 #define WIFI_PRIMARY_TIMEOUT_MS     30000UL
 
+// ─── WiFi reconnect state machine ─────────────────────────────────────────────
+// Phase 1: retry primary only (first WIFI_RECONN_PRIMARY_MS after loss)
+// Phase 2: retry secondary only (next WIFI_RECONN_SECONDARY_MS, if configured)
+// Phase 3: raise AP + alternate primary/secondary every WIFI_RECONN_AP_RETRY_MS
+#define WIFI_RECONN_ATTEMPT_MS      10000UL   // between WiFi.begin() calls in phases 1-2
+#define WIFI_RECONN_PRIMARY_MS      30000UL   // duration of primary-only phase
+#define WIFI_RECONN_SECONDARY_MS    30000UL   // duration of secondary-only phase
+#define WIFI_RECONN_AP_RETRY_MS     60000UL   // between retries when AP is up (phase 3)
+
 // ─── Filesystem paths ─────────────────────────────────────────────────────────
 #define WIFI_CONF_PATH      "/wifi.json"
 #define MQTT_CONF_PATH      "/mqtt.json"
