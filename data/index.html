@@ -36,6 +36,9 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
 .btn.danger{color:#e57373;border-color:#e57373;background:#2a1515}
 .btn.danger:hover{background:#3a1f1f}
 .btn-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pass-wrap{position:relative;display:inline-block}
+.pass-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#666;padding:2px;line-height:0}
+.pass-toggle:hover{color:#ccc}
 .msg{margin-top:6px;font-size:11px;min-height:14px}
 /* Sensor cards */
 #sensor-cards,#sensor-cards-other{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
@@ -120,10 +123,10 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
       <div>
         <div style="font-size:10px;color:#aaa;margin-bottom:2px;text-transform:uppercase">Primary</div>
         <div class="form-row"><label>SSID</label><input type="text" id="wifi-ssid" placeholder="Network name"><button class="btn" onclick="scanWifi()" style="margin-top:0;margin-left:4px">Scan</button></div>
-        <div class="form-row"><label>Password</label><input type="password" id="wifi-pass" placeholder="leave empty for open"><button class="btn" onclick="togglePass('wifi-pass',this)" style="margin-top:0;margin-left:4px">show</button></div>
+        <div class="form-row"><label>Password</label><div class="pass-wrap"><input type="password" id="wifi-pass" style="padding-right:24px" placeholder="leave empty for open"><input type="text" id="wifi-pass-vis" style="display:none;padding-right:24px"><button class="pass-toggle" onclick="togglePass('wifi-pass',this)" title="Show/hide"><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><circle cx='12' cy='12' r='3'/></svg></button></div></div>
         <div style="font-size:10px;color:#aaa;margin:4px 0 2px;text-transform:uppercase">Backup</div>
         <div class="form-row"><label>SSID</label><input type="text" id="wifi-ssid2" placeholder="Backup network"></div>
-        <div class="form-row"><label>Password</label><input type="password" id="wifi-pass2" placeholder="leave empty for open"><button class="btn" onclick="togglePass('wifi-pass2',this)" style="margin-top:0;margin-left:4px">show</button></div>
+        <div class="form-row"><label>Password</label><div class="pass-wrap"><input type="password" id="wifi-pass2" style="padding-right:24px" placeholder="leave empty for open"><input type="text" id="wifi-pass2-vis" style="display:none;padding-right:24px"><button class="pass-toggle" onclick="togglePass('wifi-pass2',this)" title="Show/hide"><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><circle cx='12' cy='12' r='3'/></svg></button></div></div>
         <button class="btn" onclick="saveWifi()">Save</button>
         <div class="msg" id="wifi-msg"></div>
       </div>
@@ -337,20 +340,41 @@ function scanWifi() {
   }).catch(function(){showMsg('wifi-msg','Scan failed',false)});
 }
 
+var SVG_EYE     = "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><circle cx='12' cy='12' r='3'/></svg>";
+var SVG_EYE_OFF = "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><line x1='3' y1='3' x2='21' y2='21'/></svg>";
+
 function togglePass(id, btn) {
-  var inp = document.getElementById(id);
-  var show = inp.type === 'password';
-  inp.type = show ? 'text' : 'password';
-  btn.textContent = show ? 'hide' : 'show';
+  var passEl = document.getElementById(id);
+  var visEl  = document.getElementById(id + '-vis');
+  var hiding = passEl.style.display !== 'none';
+  if (hiding) {
+    visEl.value = passEl.value;
+    visEl.placeholder = passEl.placeholder;
+    passEl.style.display = 'none';
+    visEl.style.display = '';
+    btn.innerHTML = SVG_EYE_OFF;
+  } else {
+    passEl.value = visEl.value;
+    visEl.style.display = 'none';
+    passEl.style.display = '';
+    btn.innerHTML = SVG_EYE;
+  }
+}
+
+function getPassVal(id) {
+  var passEl = document.getElementById(id);
+  return passEl.style.display === 'none'
+    ? document.getElementById(id + '-vis').value
+    : passEl.value;
 }
 
 function saveWifi() {
   var ssid = document.getElementById('wifi-ssid').value.trim();
   if (!ssid) { showMsg('wifi-msg','SSID required',false); return; }
   fetch('/api/wifi', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ssid:ssid, pass:document.getElementById('wifi-pass').value,
+    body: JSON.stringify({ssid:ssid, pass:getPassVal('wifi-pass'),
       ssid2:document.getElementById('wifi-ssid2').value.trim(),
-      pass2:document.getElementById('wifi-pass2').value})
+      pass2:getPassVal('wifi-pass2')})
   }).then(function(r){return r.json()}).then(function(d){
     showMsg('wifi-msg',d.ok?(d.msg||'Saved'):('Error: '+d.error),d.ok);
     if(d.ok) showToast('Saved — reboot to apply');

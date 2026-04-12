@@ -448,7 +448,7 @@ static void handleProvisioningConfig(const char* payload) {
     if (!doc["uart_rx"].isNull())  { hw.uart_rx  = doc["uart_rx"].as<int8_t>();   hwChanged = true; }
     if (!doc["uart_tx"].isNull())  { hw.uart_tx  = doc["uart_tx"].as<int8_t>();   hwChanged = true; }
     if (!doc["onewire"].isNull())  { hw.onewire  = doc["onewire"].as<int8_t>();   hwChanged = true; }
-    if (!doc["led_pin"].isNull())  { hw.led_pin  = doc["led_pin"].as<int8_t>();   hwChanged = true; }
+    if (!doc["led_pin"].isNull())  { hw.led_pin  = doc["led_pin"].as<int8_t>();   hwChanged = true; ledInit(hw.led_pin); ledSetState(LED_MQTT_OK); }
     if (!doc["5v_pin"].isNull())   { hw.pin5v    = doc["5v_pin"].as<int8_t>();    hwChanged = true; }
 
     hw.provisioned = true;
