@@ -99,6 +99,8 @@ static void handleGetWifi() {
     doc["apMode"]    = STATE_GET(apMode);
     doc["ssid"]      = ssid;
     doc["ssid2"]     = ssid2;
+    doc["hasPass"]   = (strlen(pass)  > 0);
+    doc["hasPass2"]  = (strlen(pass2) > 0);
     doc["connected"] = (WiFi.status() == WL_CONNECTED);
     sendJsonDoc(200, doc);
 }
@@ -118,7 +120,16 @@ static void handlePostWifi() {
     const char* pass2 = doc["pass2"] | "";
     if (strlen(ssid) == 0) { sendJson(400, "{\"error\":\"ssid required\"}"); return; }
     if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
-    if (!saveWifiCreds(ssid, pass, ssid2, pass2)) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
+
+    // If a password field is empty, preserve the existing stored password for
+    // that SSID rather than overwriting it — the UI never echoes saved passwords.
+    char curSsid[33]={}, curPass[65]={}, curSsid2[33]={}, curPass2[65]={};
+    loadWifiCreds(curSsid, sizeof(curSsid), curPass, sizeof(curPass),
+                  curSsid2, sizeof(curSsid2), curPass2, sizeof(curPass2));
+    const char* effectivePass  = (strlen(pass)  == 0 && strcmp(ssid,  curSsid)  == 0) ? curPass  : pass;
+    const char* effectivePass2 = (strlen(pass2) == 0 && strcmp(ssid2, curSsid2) == 0) ? curPass2 : pass2;
+
+    if (!saveWifiCreds(ssid, effectivePass, ssid2, effectivePass2)) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
     logMessage(String("WiFi saved: ") + ssid, "info");
     sendJson(200, "{\"ok\":true,\"msg\":\"Saved.\"}");
 

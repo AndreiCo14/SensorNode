@@ -120,10 +120,10 @@ textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px
       <div>
         <div style="font-size:10px;color:#aaa;margin-bottom:2px;text-transform:uppercase">Primary</div>
         <div class="form-row"><label>SSID</label><input type="text" id="wifi-ssid" placeholder="Network name"><button class="btn" onclick="scanWifi()" style="margin-top:0;margin-left:4px">Scan</button></div>
-        <div class="form-row"><label>Password</label><input type="password" id="wifi-pass" placeholder="leave empty for open"></div>
+        <div class="form-row"><label>Password</label><input type="password" id="wifi-pass" placeholder="leave empty for open"><button class="btn" onclick="togglePass('wifi-pass',this)" style="margin-top:0;margin-left:4px">show</button></div>
         <div style="font-size:10px;color:#aaa;margin:4px 0 2px;text-transform:uppercase">Backup</div>
         <div class="form-row"><label>SSID</label><input type="text" id="wifi-ssid2" placeholder="Backup network"></div>
-        <div class="form-row"><label>Password</label><input type="password" id="wifi-pass2" placeholder="leave empty for open"></div>
+        <div class="form-row"><label>Password</label><input type="password" id="wifi-pass2" placeholder="leave empty for open"><button class="btn" onclick="togglePass('wifi-pass2',this)" style="margin-top:0;margin-left:4px">show</button></div>
         <button class="btn" onclick="saveWifi()">Save</button>
         <div class="msg" id="wifi-msg"></div>
       </div>
@@ -314,6 +314,8 @@ function loadWifi() {
     document.getElementById('wifi-ap-banner').style.display = d.apMode ? 'block' : 'none';
     if (d.ssid)  document.getElementById('wifi-ssid').value  = d.ssid;
     if (d.ssid2) document.getElementById('wifi-ssid2').value = d.ssid2;
+    document.getElementById('wifi-pass').placeholder  = d.hasPass  ? 'password saved (leave blank to keep)' : 'leave empty for open';
+    document.getElementById('wifi-pass2').placeholder = d.hasPass2 ? 'password saved (leave blank to keep)' : 'leave empty for open';
   }).catch(function(){});
 }
 
@@ -333,6 +335,13 @@ function scanWifi() {
     document.getElementById('wifi-scan-list').style.display = nets.length ? 'block' : 'none';
     showMsg('wifi-msg', nets.length+' networks found', true);
   }).catch(function(){showMsg('wifi-msg','Scan failed',false)});
+}
+
+function togglePass(id, btn) {
+  var inp = document.getElementById(id);
+  var show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.textContent = show ? 'hide' : 'show';
 }
 
 function saveWifi() {

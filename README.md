@@ -5,14 +5,15 @@
 1. [Overview](#overview)
 2. [Hardware](#hardware)
 3. [First-Time Setup](#first-time-setup)
-4. [Web Interface](#web-interface)
-5. [Supported Sensors](#supported-sensors)
-6. [MQTT Integration](#mqtt-integration)
-7. [LED Indicator](#led-indicator)
-8. [OTA Firmware Updates](#ota-firmware-updates)
-9. [Feature Flags](#feature-flags)
-10. [Advanced Configuration](#advanced-configuration)
-11. [TODO List](#todo-list)
+4. [WiFi Reconnect](#wifi-reconnect)
+5. [Web Interface](#web-interface)
+6. [Supported Sensors](#supported-sensors)
+7. [MQTT Integration](#mqtt-integration)
+8. [LED Indicator](#led-indicator)
+9. [OTA Firmware Updates](#ota-firmware-updates)
+10. [Feature Flags](#feature-flags)
+11. [Advanced Configuration](#advanced-configuration)
+12. [TODO List](#todo-list)
 
 ---
 
@@ -118,6 +119,26 @@ After reboot the device connects to MQTT and publishes a startup message to `Sen
 The defaults work for standard D1 Mini wiring. If your board is different, open **Hardware Setup** and adjust I2C, UART, OneWire, and LED pin numbers. Use `-1` to disable a pin.
 
 Reboot once after any hardware pin change.
+
+---
+
+## WiFi Reconnect
+
+After the initial connection is established, the firmware monitors WiFi continuously and reconnects automatically — regardless of cause (signal loss, MAC blacklist, credential change, AP disappearing, etc.).
+
+Recovery follows a three-phase escalation:
+
+| Phase | Window | Action |
+|-------|--------|--------|
+| 1 — Primary | 0–30 s | Retry primary network every 10 s |
+| 2 — Secondary | 30–60 s | Retry secondary network every 10 s (skipped if not configured) |
+| 3 — AP + retry | 60 s+ | Config portal AP raised; both networks retried alternately every 60 s |
+
+When either network comes back, the AP is closed automatically, NTP re-syncs, and MQTT reconnects.
+
+The same logic applies if no network is found at boot: after the 3-minute startup AP window expires, the device enters phase 3 and retries indefinitely in the background.
+
+See [docs/wifi-reconnect.md](docs/wifi-reconnect.md) for the full state machine description and timing constants.
 
 ---
 
@@ -351,8 +372,8 @@ If a WS2812B LED is connected (LED pin ≠ -1), it shows device state:
 
 | Color | Pattern | State |
 |-------|---------|-------|
-| Purple | Solid | AP mode — no WiFi credentials, waiting for config |
-| Blue | Pulsing | Connecting to WiFi |
+| Purple | Solid | AP mode — no credentials stored, or reconnect phase 3 (AP up, retrying in background) |
+| Blue | Pulsing | Connecting / reconnecting to WiFi (phases 1–2) |
 | Green | Pulsing | WiFi connected, MQTT not yet connected |
 | Yellow | Solid (2 min then off) | MQTT connected and operational |
 | Red | Solid | Error |
