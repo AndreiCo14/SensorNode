@@ -10,6 +10,7 @@
 #include "bmp580_sensor.h"
 #include "htu21d_sensor.h"
 #include "xdb401_sensor.h"
+#include "geiger_sensor.h"
 #include "../logger.h"
 #include "../queues.h"
 #include "../system_state.h"
@@ -49,6 +50,7 @@ static SensorBase* makeSensor(const char* type) {
     if (strcmp(type, "bmp580")  == 0) return new Bmp580Sensor();
     if (strcmp(type, "htu21d")  == 0) return new Htu21dSensor();
     if (strcmp(type, "xdb401")  == 0) return new Xdb401Sensor();
+    if (strcmp(type, "geiger")  == 0) return new GeigerSensor();
     return nullptr;
 }
 
@@ -99,6 +101,12 @@ void sensorsInit() {
             int8_t setPin = entry["set_pin"].isNull() ? (int8_t)-1 : entry["set_pin"].as<int8_t>();
             bool   setInv = entry["set_inverted"] | true;
             static_cast<Pms7003Sensor*>(s)->setPins(hwCfg.pin5v, setPin, setInv);
+        }
+
+        // Geiger counter: GPIO pin from sensor config
+        if (strcmp(type, "geiger") == 0) {
+            int8_t pin = entry["pin"].isNull() ? (int8_t)-1 : entry["pin"].as<int8_t>();
+            static_cast<GeigerSensor*>(s)->setPin(pin);
         }
 
         // Check for I2C address collisions before initialising

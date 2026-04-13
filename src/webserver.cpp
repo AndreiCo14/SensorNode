@@ -14,6 +14,14 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <time.h>
+#ifdef ESP8266
+#include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
+#else
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <WiFiClient.h>
+#endif
 
 static WebServerT httpServer(80);
 static volatile bool rebootPending = false;
@@ -326,6 +334,58 @@ static void handlePostCmd() {
         sendJson(503, "{\"error\":\"cmdQueue full\"}");
 }
 
+// ─── GET /api/ota/version ─────────────────────────────────────────────────────
+
+static void handleGetOtaVersion() {
+    if (strlen(OTA_VERSION_URL) == 0) {
+        sendJson(503, "{\"ok\":false,\"error\":\"OTA_VERSION_URL not set\"}");
+        return;
+    }
+    HTTPClient http;
+#ifdef ESP8266
+    // Force HTTP on ESP8266 — BearSSL OOM risk with WebSocket open
+    String url = String(OTA_VERSION_URL);
+    if (url.startsWith("https://")) url = "http://" + url.substring(8);
+    WiFiClient wifiClient;
+    http.begin(wifiClient, url);
+#else
+    bool isHttps = (strncmp(OTA_VERSION_URL, "https", 5) == 0);
+    WiFiClientSecure secureClient;
+    WiFiClient       plainClient;
+    if (isHttps) { secureClient.setInsecure(); http.begin(secureClient, OTA_VERSION_URL); }
+    else          { http.begin(plainClient, OTA_VERSION_URL); }
+#endif
+    http.setTimeout(8000);
+    int code = http.GET();
+    if (code != HTTP_CODE_OK) {
+        http.end();
+        sendJson(502, String("{\"ok\":false,\"error\":\"HTTP ") + code + "\"}");
+        return;
+    }
+    String body = http.getString();
+    http.end();
+
+    JsonDocument remote;
+    if (deserializeJson(remote, body)) {
+        sendJson(502, "{\"ok\":false,\"error\":\"invalid JSON\"}");
+        return;
+    }
+    const char* remoteBuild = remote["build"];
+    const char* binUrl      = remote["url"];
+    if (!remoteBuild || !binUrl) {
+        sendJson(502, "{\"ok\":false,\"error\":\"missing fields\"}");
+        return;
+    }
+
+    JsonDocument doc;
+    doc["ok"]           = true;
+    doc["remoteBuild"]  = remoteBuild;
+    doc["currentBuild"] = FW_BUILD;
+    doc["upToDate"]     = (strcmp(remoteBuild, FW_BUILD) == 0);
+    doc["url"]          = binUrl;
+    sendJsonDoc(200, doc);
+}
+
 // ─── POST /api/ota ────────────────────────────────────────────────────────────
 
 static bool otaBeginOk = false;
@@ -533,7 +593,8 @@ static void webServerSetup() {
     httpServer.on("/api/state",      HTTP_GET,  handleGetState);
     httpServer.on("/api/cmd",        HTTP_POST, handlePostCmd);
     httpServer.on("/api/fs",         HTTP_GET,  handleGetFs);
-    httpServer.on("/api/ota",        HTTP_POST, handleOtaResponse, handleOtaUpload);
+    httpServer.on("/api/ota",         HTTP_POST, handleOtaResponse, handleOtaUpload);
+    httpServer.on("/api/ota/version", HTTP_GET,  handleGetOtaVersion);
 
     httpServer.onNotFound([]() {
         String path = httpServer.uri();
