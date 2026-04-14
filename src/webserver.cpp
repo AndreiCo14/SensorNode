@@ -214,6 +214,11 @@ static void handleGetHwConfig() {
     doc["onewire"]       = cfg.onewire;
     doc["led_pin"]       = cfg.led_pin;
     doc["5v_pin"]        = cfg.pin5v;
+    for (uint8_t i = 0; i < cfg.gpio_count; i++) {
+        if (cfg.gpio_pin[i] < 0) continue;
+        char key[10]; snprintf(key, sizeof(key), "gpio%d", cfg.gpio_pin[i]);
+        doc[key] = cfg.gpio_mode[i];
+    }
     doc["teleIntervalM"] = cfg.teleIntervalM;
     doc["sampleNum"]     = cfg.sampleNum;
     doc["onTime"]        = cfg.onTime;
@@ -237,6 +242,21 @@ static void handlePostHwConfig() {
     if (!doc["onewire"].isNull())       cfg.onewire       = doc["onewire"].as<int8_t>();
     if (!doc["led_pin"].isNull())       cfg.led_pin       = doc["led_pin"].as<int8_t>();
     if (!doc["5v_pin"].isNull())        cfg.pin5v         = doc["5v_pin"].as<int8_t>();
+    // Re-parse all gpio# entries from incoming doc (replaces existing set)
+    {
+        uint8_t n = 0;
+        for (uint8_t i = 0; i < HwConfig::GPIO_CTRL_MAX; i++) cfg.gpio_pin[i] = -1;
+        for (JsonPair kv : doc.as<JsonObject>()) {
+            const char* key = kv.key().c_str();
+            if (strncmp(key, "gpio", 4) != 0 || !isdigit((unsigned char)key[4])) continue;
+            if (n >= HwConfig::GPIO_CTRL_MAX) break;
+            cfg.gpio_pin[n] = (int8_t)atoi(key + 4);
+            strncpy(cfg.gpio_mode[n], kv.value() | "invert", 7);
+            cfg.gpio_mode[n][7] = '\0';
+            n++;
+        }
+        cfg.gpio_count = n;
+    }
     if (!doc["teleIntervalM"].isNull()) cfg.teleIntervalM = doc["teleIntervalM"].as<uint16_t>();
     if (!doc["sampleNum"].isNull())     cfg.sampleNum     = doc["sampleNum"].as<int8_t>();
     if (!doc["onTime"].isNull())        cfg.onTime        = doc["onTime"].as<uint16_t>();
@@ -281,6 +301,11 @@ static void handleGetConfigExport() {
     doc["hw"]["onewire"]       = hw.onewire;
     doc["hw"]["led_pin"]       = hw.led_pin;
     doc["hw"]["5v_pin"]        = hw.pin5v;
+    for (uint8_t i = 0; i < hw.gpio_count; i++) {
+        if (hw.gpio_pin[i] < 0) continue;
+        char key[10]; snprintf(key, sizeof(key), "gpio%d", hw.gpio_pin[i]);
+        doc["hw"][key] = hw.gpio_mode[i];
+    }
     doc["hw"]["teleIntervalM"] = hw.teleIntervalM;
     doc["hw"]["sampleNum"]     = hw.sampleNum;
     doc["hw"]["onTime"]        = hw.onTime;
@@ -496,7 +521,11 @@ static void handleStaticFile(const String& path) {
     if (fullPath.endsWith("/")) fullPath += "index.html";
 
     if (fullPath == "/index.html") {
-        httpServer.send_P(200, "text/html", INDEX_HTML);
+        httpServer.sendHeader("Content-Encoding", "gzip");
+        httpServer.sendHeader("Connection", "close");
+        httpServer.send_P(200, "text/html",
+                          reinterpret_cast<const char*>(INDEX_HTML_GZ),
+                          INDEX_HTML_GZ_LEN);
         return;
     }
 

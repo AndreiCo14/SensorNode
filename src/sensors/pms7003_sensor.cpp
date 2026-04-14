@@ -5,25 +5,6 @@
 
 static const uint16_t PMS_DEFAULT_ONTIME = 30;  // seconds
 
-// ─── Hardware control ─────────────────────────────────────────────────────────
-
-void Pms7003Sensor::setPins(int8_t pwrPin, int8_t setPin, bool setInverted) {
-    _pwrPin      = pwrPin;
-    _setPin      = setPin;
-    _setInverted = setInverted;
-}
-
-void Pms7003Sensor::powerOn() {
-    if (_setPin >= 0) digitalWrite(_setPin, _setInverted ? LOW : HIGH);
-    if (_pwrPin >= 0) digitalWrite(_pwrPin, HIGH);
-    Serial.begin(9600);
-}
-
-void Pms7003Sensor::powerOff() {
-    if (_pwrPin >= 0) digitalWrite(_pwrPin, LOW);
-    if (_setPin >= 0) digitalWrite(_setPin, _setInverted ? HIGH : LOW);
-}
-
 // ─── Frame parsing ────────────────────────────────────────────────────────────
 
 bool Pms7003Sensor::validateFrame(const uint8_t* buf) const {
@@ -59,8 +40,6 @@ void Pms7003Sensor::parseSerial() {
 // ─── SensorBase interface ─────────────────────────────────────────────────────
 
 bool Pms7003Sensor::begin(int, int, int, int, int) {
-    if (_pwrPin >= 0) { pinMode(_pwrPin, OUTPUT); digitalWrite(_pwrPin, LOW); }
-    if (_setPin >= 0) { pinMode(_setPin, OUTPUT); digitalWrite(_setPin, _setInverted ? HIGH : LOW); }
     _state    = State::IDLE;
     _rbHead   = 0;
     _rbCount  = 0;
@@ -77,7 +56,6 @@ bool Pms7003Sensor::read(SensorReading& r) {
     snprintf(r.data, sizeof(r.data),
              "{\"PMS1\":%.1f,\"PMS25\":%.1f,\"PMS10\":%.1f}",
              _pm1, _pm25, _pm10);
-    powerOff();
     _state = State::IDLE;
     return true;
 }
@@ -94,7 +72,7 @@ void Pms7003Sensor::tick(uint32_t nextReadMs) {
             _rbCount   = 0;
             _bufPos    = 0;
             _powerOnMs = now;
-            powerOn();
+            Serial.begin(9600);
             _state = State::WARMING;
         }
         return;
@@ -118,7 +96,6 @@ void Pms7003Sensor::tick(uint32_t nextReadMs) {
                 _state = State::DATA_READY;
             } else {
                 logMessage("PMS7003: no frames after warmup", "warn");
-                powerOff();
                 _state = State::IDLE;
             }
         }

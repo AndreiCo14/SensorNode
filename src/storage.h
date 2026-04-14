@@ -26,6 +26,12 @@ struct HwConfig {
     int8_t   onewire;
     int8_t   led_pin;
     int8_t   pin5v;
+    // Controlled GPIOs: key in JSON is "gpio<pin>", value is mode string.
+    // gpio_pin[i] == -1 marks an unused slot.
+    static const uint8_t GPIO_CTRL_MAX = 8;
+    int8_t gpio_pin[GPIO_CTRL_MAX];
+    char   gpio_mode[GPIO_CTRL_MAX][8];  // "follow", "invert", "on", "off"
+    uint8_t gpio_count;
     uint16_t intervalSec;
     // Operational params — persisted so they survive reboots
     uint16_t teleIntervalM;

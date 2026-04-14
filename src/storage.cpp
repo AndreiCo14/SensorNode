@@ -252,6 +252,8 @@ bool loadHwConfig(HwConfig& cfg) {
     cfg.onewire      = DEFAULT_ONEWIRE;
     cfg.led_pin      = DEFAULT_LED_PIN;
     cfg.pin5v        = DEFAULT_5V_PIN;
+    for (uint8_t i = 0; i < HwConfig::GPIO_CTRL_MAX; i++) cfg.gpio_pin[i] = -1;
+    cfg.gpio_count = 0;
     cfg.intervalSec  = 60;
     cfg.teleIntervalM = DEFAULT_TELE_INTERVAL_M;
     cfg.sampleNum    = DEFAULT_SAMPLE_NUM;
@@ -268,6 +270,16 @@ bool loadHwConfig(HwConfig& cfg) {
     if (!doc["onewire"].isNull())       cfg.onewire      = doc["onewire"].as<int8_t>();
     if (!doc["led_pin"].isNull())       cfg.led_pin      = doc["led_pin"].as<int8_t>();
     if (!doc["5v_pin"].isNull())        cfg.pin5v        = doc["5v_pin"].as<int8_t>();
+    for (JsonPair kv : doc.as<JsonObject>()) {
+        const char* key = kv.key().c_str();
+        if (strncmp(key, "gpio", 4) != 0 || !isdigit((unsigned char)key[4])) continue;
+        if (cfg.gpio_count >= HwConfig::GPIO_CTRL_MAX) break;
+        int pin = atoi(key + 4);
+        cfg.gpio_pin[cfg.gpio_count] = (int8_t)pin;
+        strncpy(cfg.gpio_mode[cfg.gpio_count], kv.value() | "invert", 7);
+        cfg.gpio_mode[cfg.gpio_count][7] = '\0';
+        cfg.gpio_count++;
+    }
     if (!doc["interval"].isNull())      cfg.intervalSec  = doc["interval"].as<uint16_t>();
     if (!doc["teleIntervalM"].isNull()) cfg.teleIntervalM = doc["teleIntervalM"].as<uint16_t>();
     if (!doc["sampleNum"].isNull())     cfg.sampleNum    = doc["sampleNum"].as<int8_t>();
@@ -289,6 +301,12 @@ bool saveHwConfig(const HwConfig& cfg) {
     doc["onewire"]       = cfg.onewire;
     doc["led_pin"]       = cfg.led_pin;
     doc["5v_pin"]        = cfg.pin5v;
+    for (uint8_t i = 0; i < cfg.gpio_count; i++) {
+        if (cfg.gpio_pin[i] < 0) continue;
+        char key[10];
+        snprintf(key, sizeof(key), "gpio%d", cfg.gpio_pin[i]);
+        doc[key] = cfg.gpio_mode[i];
+    }
     doc["interval"]      = cfg.intervalSec;
     doc["teleIntervalM"] = cfg.teleIntervalM;
     doc["sampleNum"]     = cfg.sampleNum;
