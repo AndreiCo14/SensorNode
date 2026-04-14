@@ -10,6 +10,7 @@
 #include "bmp580_sensor.h"
 #include "htu21d_sensor.h"
 #include "xdb401_sensor.h"
+#include "geiger_sensor.h"
 #include "../logger.h"
 #include "../queues.h"
 #include "../system_state.h"
@@ -22,8 +23,18 @@ static SensorBase* sensors[MAX_SENSORS] = {};
 static uint8_t     sensorCount = 0;
 static uint8_t     activeCount = 0;
 static HwConfig    hwCfg;
+static char        s_lastData[MAX_SENSORS][SENSOR_DATA_MAX];
 
 uint8_t sensorsActiveCount() { return activeCount; }
+
+void sensorGetLastValues(JsonDocument& out) {
+    for (uint8_t i = 0; i < sensorCount; i++) {
+        if (!sensors[i] || s_lastData[i][0] == '\0') continue;
+        JsonDocument inner;
+        if (deserializeJson(inner, s_lastData[i]) == DeserializationError::Ok)
+            out[sensors[i]->type()] = inner;
+    }
+}
 
 // ─── Find or create a sensor instance of the given type ──────────────────────
 
@@ -39,6 +50,7 @@ static SensorBase* makeSensor(const char* type) {
     if (strcmp(type, "bmp580")  == 0) return new Bmp580Sensor();
     if (strcmp(type, "htu21d")  == 0) return new Htu21dSensor();
     if (strcmp(type, "xdb401")  == 0) return new Xdb401Sensor();
+    if (strcmp(type, "geiger")  == 0) return new GeigerSensor();
     return nullptr;
 }
 
@@ -89,6 +101,12 @@ void sensorsInit() {
             int8_t setPin = entry["set_pin"].isNull() ? (int8_t)-1 : entry["set_pin"].as<int8_t>();
             bool   setInv = entry["set_inverted"] | true;
             static_cast<Pms7003Sensor*>(s)->setPins(hwCfg.pin5v, setPin, setInv);
+        }
+
+        // Geiger counter: GPIO pin from sensor config
+        if (strcmp(type, "geiger") == 0) {
+            int8_t pin = entry["pin"].isNull() ? (int8_t)-1 : entry["pin"].as<int8_t>();
+            static_cast<GeigerSensor*>(s)->setPin(pin);
         }
 
         // Check for I2C address collisions before initialising
@@ -169,6 +187,19 @@ void sensorsEnableDeepSleep() {
     logMessage("Sensors enabled (deep sleep — read in " + String(onTimeSec + 5) + "s)", "info");
 }
 
+void sensorsReinit() {
+    s_enabled = false;
+    vTaskDelay(pdMS_TO_TICKS(20));  // let sensorTask finish current tick
+    for (uint8_t i = 0; i < sensorCount; i++) {
+        delete sensors[i];
+        sensors[i] = nullptr;
+    }
+    memset(s_lastData, 0, sizeof(s_lastData));
+    sensorsInit();
+    s_lastRead = millis();
+    s_enabled  = true;
+}
+
 static void doSensorRead() {
     s_lastRead = millis();
     uint32_t chipId = STATE_GET(chipId);
@@ -186,6 +217,7 @@ static void doSensorRead() {
         SensorReading r = {};
         r.deviceId = chipId;
         if (!sensors[i]->read(r)) continue;
+        strncpy(s_lastData[i], r.data, SENSOR_DATA_MAX - 1);
 
         // r.data = {"k":v,...} — strip braces and append inner content
         size_t dlen = strlen(r.data);

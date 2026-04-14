@@ -1,679 +1,936 @@
+// Auto-generated from data/index.html — do not edit manually
 #pragma once
+#include <pgmspace.h>
 
-static const char INDEX_HTML[] PROGMEM =
-  "<!DOCTYPE html>\n"
-  "<html lang=\"en\">\n"
-  "<head>\n"
-  "<meta charset=\"utf-8\">\n"
-  "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
-  "<title>AirMQ SensorNode</title>\n"
-  "<link rel=\"icon\" type=\"image/x-icon\" href=\"/favicon.ico\">\n"
-  "<style>\n"
-  "*{box-sizing:border-box;margin:0;padding:0}\n"
-  "body{font-family:monospace;font-size:13px;background:#111;color:#ccc;display:flex;flex-direction:column;min-height:100vh}\n"
-  "header{background:#1a1a2e;padding:10px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #333}\n"
-  "header h1{font-size:15px;color:#7eb8f7;letter-spacing:1px}\n"
-  "#refresh-btn{margin-left:auto;background:#23395d;color:#7eb8f7;border:1px solid #7eb8f7;padding:3px 10px;cursor:pointer;border-radius:3px}\n"
-  "#refresh-btn:hover{background:#2d4a7a}\n"
-  "main{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:12px;flex:1}\n"
-  "@media(max-width:640px){main{grid-template-columns:1fr}}\n"
-  "section{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:4px;padding:12px}\n"
-  "section h2{font-size:11px;color:#7eb8f7;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #2a2a2a}\n"
-  ".full{grid-column:1/-1}\n"
-  ".stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}\n"
-  ".stat{background:#111;border:1px solid #252525;border-radius:3px;padding:6px 8px}\n"
-  ".stat .label{color:#666;font-size:10px;margin-bottom:2px}\n"
-  ".stat .value{color:#e0e0e0;font-size:13px}\n"
-  ".ok{color:#4caf50}\n"
-  ".err{color:#e53935}\n"
-  ".warn{color:#ffa726}\n"
-  ".form-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}\n"
-  ".form-row label{color:#888;width:90px;flex-shrink:0;font-size:11px}\n"
-  ".form-row input[type=number],.form-row input[type=text],.form-row input[type=password]{background:#111;border:1px solid #333;color:#ddd;padding:3px 6px;border-radius:2px}\n"
-  ".form-row input[type=number]{width:70px}\n"
-  ".form-row input[type=text],.form-row input[type=password]{width:180px}\n"
-  ".form-row input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:#7eb8f7}\n"
-  "textarea{width:100%;background:#111;border:1px solid #333;color:#ddd;padding:6px;border-radius:2px;min-height:120px;resize:vertical;font-family:monospace;font-size:12px}\n"
-  ".btn{background:#23395d;color:#7eb8f7;border:1px solid #7eb8f7;padding:4px 12px;cursor:pointer;border-radius:3px;font-family:monospace;font-size:12px;margin-top:6px}\n"
-  ".btn:hover{background:#2d4a7a}\n"
-  ".btn.danger{color:#e57373;border-color:#e57373;background:#2a1515}\n"
-  ".btn.danger:hover{background:#3a1f1f}\n"
-  ".btn-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}\n"
-  ".msg{margin-top:6px;font-size:11px;min-height:14px}\n"
-  "/* Sensor cards */\n"
-  "#sensor-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}\n"
-  ".sensor-card{border:1px solid #2a2a2a;border-radius:3px;padding:5px 7px;background:#141414}\n"
-  ".sensor-card .sc-head{display:flex;align-items:center;gap:6px}\n"
-  ".sensor-card .sc-type{color:#7eb8f7;font-size:12px;flex:1}\n"
-  ".sensor-card .sc-fields{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}\n"
-  ".sensor-card .sc-field{display:flex;align-items:center;gap:4px;font-size:11px;color:#888}\n"
-  ".sensor-card .sc-field input{width:56px;background:#111;border:1px solid #333;color:#ddd;padding:2px 4px;border-radius:2px;font-size:11px}\n"
-  "/* Log */\n"
-  "#log{height:240px;overflow-y:auto;background:#0d0d0d;border:1px solid #222;padding:6px;border-radius:2px;display:flex;flex-direction:column}\n"
-  ".log-entry{padding:1px 0;white-space:pre-wrap;word-break:break-all;line-height:1.5}\n"
-  ".log-info{color:#9ecfff}\n"
-  ".log-warn{color:#ffa726}\n"
-  ".log-error{color:#e57373}\n"
-  ".log-debug{color:#666}\n"
-  ".log-ts{color:#444;font-size:11px;margin-right:6px}\n"
-  ".ws-status{font-size:10px;color:#666;margin-bottom:4px}\n"
-  ".ws-ok{color:#4caf50}\n"
-  ".ws-err{color:#e53935}\n"
-  "/* Drag */\n"
-  ".draggable-section{position:relative}\n"
-  ".draggable-section>h2{cursor:grab;user-select:none}\n"
-  ".draggable-section>h2::before{content:'⠿\\00a0';color:#444}\n"
-  ".dragging{opacity:.4}\n"
-  ".drag-over{outline:1px solid #7eb8f7}\n"
-  ".sec-grip{position:absolute;right:4px;top:0;bottom:0;display:flex;align-items:center;cursor:ew-resize;color:#333;user-select:none;font-size:13px}\n"
-  ".sec-grip:hover{color:#7eb8f7}\n"
-  "/* Toast */\n"
-  "#toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#1e2e10;border:1px solid #8bc34a;color:#8bc34a;padding:7px 18px;border-radius:4px;font-size:12px;z-index:999;pointer-events:none;opacity:0;transition:opacity .25s}\n"
-  "#toast.show{opacity:1}\n"
-  "</style>\n"
-  "</head>\n"
-  "<body>\n"
-  "<div id=\"toast\"></div>\n"
-  "<header>\n"
-  "  <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"4100 5000 10500 12600\" height=\"47\" style=\"flex-shrink:0\"><style>.fil0{fill:#7eb8f7}.fil1{fill:#1a1a2e}</style><g><path class=\"fil0\" d=\"M4996.26 8916.16c147.58,-30.97 607.63,-92.99 687.54,-169.82 492.51,-473.48 576,-716.5 1487.39,-1184.03 1551.97,-796.14 3396.47,-663.79 4857.59,302.18 690.06,456.22 1295.07,1156.5 1640.46,1904.34 79.7,172.57 179.95,499.69 261.89,640.63l400.8 -163.74c-58.59,-417.23 -541.44,-1238.48 -802.62,-1580.31 -1662.08,-2175.33 -4760.53,-2767.55 -7106.69,-1190.38l-410.35 303.99c-56.6,43.32 -71.04,65.35 -124.91,112.55 -293.04,256.76 -696.26,682.96 -891.1,1024.59z\"/><path class=\"fil0\" d=\"M4143.71 11171.54l-35.9 550.95c245.81,-87.52 482.21,-334.48 1136.42,-504.76 1421.16,-369.91 2755.43,261.89 3996.55,810.66 1630.45,720.91 3213.85,1348.49 4992.89,665.13l272.86 -130c41.53,-31.3 67.81,-448.54 77.09,-526.25 -421.4,138.17 -524.12,303.15 -1236.56,431 -1396.18,250.55 -2790.05,-349.08 -3996.19,-894.19 -1222.15,-552.35 -2588.22,-1129.02 -3997.03,-852.47 -534.53,104.92 -783.84,268.9 -1210.13,449.93z\"/><path class=\"fil0\" d=\"M4373.13 10350.09c375.36,-133.94 478.4,-307.24 1176.58,-440.1 2538.18,-483.01 4832.06,2155.86 7719,1791.7 353.98,-44.65 1013.32,-187.69 1256.3,-369.04l-67.46 -449.42c-140.49,29.48 -413.85,166.66 -594.07,222.6 -731.56,227.05 -1445,209.53 -2186.35,44.57 -1740.34,-387.23 -3173.29,-1490.58 -4946.31,-1716.98 -524.38,-66.96 -1026.33,-42.55 -1521.03,83.68 -158.79,40.52 -507.83,127.69 -592.45,226.69 -53.95,63.11 -221.18,501.27 -244.21,606.3z\"/><path class=\"fil0\" d=\"M4275.06 12839.75c173.69,-63.28 367.89,-187.5 580.56,-264.69 1641.23,-595.71 3060.08,164.69 4539.9,806.19 1249.31,541.58 2579.03,1057.51 4007.49,783.78 137.36,-26.32 552.59,-108.6 629.47,-191.19 51.36,-55.18 224.22,-473.94 241.74,-569.24 -443.7,156.5 -707.66,294.62 -1248.93,353.18 -3096.37,334.97 -5534.92,-3062.86 -8845.11,-1381.93 -0.96,139.37 29.34,358.84 94.88,463.9z\"/><path class=\"fil0\" d=\"M10451.41 16306.19c-37.3,-271.97 353.7,-325.6 396.6,-68.75 45.53,272.66 -363.62,309.27 -396.6,68.75zm-1510.88 -2172.21c233.26,-104.9 372.58,283.66 139.94,368.92 -254.39,93.23 -411.36,-246.85 -139.94,-368.92zm-274.34 -182.67c-207.53,180.98 -330.03,899.71 505.72,845.8 58.71,83.11 380.23,405.42 470.22,480.56 141.17,117.87 655.34,62.38 876.3,62.38l1859.73 5.88c-885.66,804.38 -430.92,716.52 -1256.63,718.65 -73.47,-122.58 -91.29,-173.36 -224.93,-243.2 -708.47,-370.26 -1096.18,820.76 -340.46,948.24 362.03,61.06 475.62,-164.08 572.31,-296.24 468.88,0.67 644.98,63.38 831.43,-127.85l940.53 -937.76c64.01,-63.38 198.13,-153.48 186.7,-289.99 -11.98,-143.18 -123.22,-179.21 -265.46,-181.26 -870.05,-12.55 -2029.53,32.54 -2834.51,3.32 -236.64,-8.59 -281.39,-231.03 -526.9,-404.08 141.02,-814 -570.85,-779.11 -794.05,-584.45z\"/><path class=\"fil0\" d=\"M7611.38 16352.69c216.34,-116.33 389.4,226.34 181.31,350.62 -217.23,129.73 -462.66,-199.33 -181.31,-350.62zm-1271.08 -2091.59c256.75,-100.72 365.14,298.85 146.72,371.63 -280.56,93.48 -401.95,-271.51 -146.72,-371.63zm879.41 2033.32c-64.28,361.82 -23.45,574.11 255.9,700.69 622.96,282.26 1023.83,-643.51 442.3,-919.7 -144.55,-68.65 -318.72,-20.08 -395.75,-55.6 -23.62,-10.89 -217.17,-211 -253.32,-247.09 -329.39,-328.83 -228.62,-190 -774.15,-220.89 -180.19,-10.2 -366.1,-270.6 -555.73,-459.84 -625.4,-624.13 -616.01,-494.17 -613.95,-902.18 0.81,-161.87 0.69,-324.27 -0.63,-486.73l877.24 8.14c-4.1,260.88 53.09,225.61 -110.58,363.05 -84.15,70.67 -155.15,155.41 -173.59,303.78 -79.04,636.07 821.4,761.83 966.67,197.44 105.67,-410.52 -232.16,-491.72 -272.3,-623.8 2.1,-396.32 103.34,-657.27 -324.92,-655.45 -317.9,1.35 -635.9,2.08 -953.83,0.75 -483.98,-2.01 -415.65,60.35 -415.46,522.42 0.45,1086.21 -156.18,684.66 1019.46,1856.49 244.46,243.66 183.21,284.81 666.09,280.93 479.79,-3.86 230.23,55.04 616.55,337.59z\"/><path class=\"fil0\" d=\"M6685.35 8763.62c95.68,63.84 329.33,68.82 465.25,93.67 190.55,34.84 257.11,-67.75 400.06,-148.52 1340.97,-757.74 3049.02,-589.94 4130.84,376.49 348.31,311.17 925.26,958.46 1048.11,1544.04 437.11,1.02 500,8.32 443.34,-146.82 -60.81,-166.47 -131.31,-336.97 -206.96,-486.77 -1193.76,-2363.73 -4298.51,-2936.24 -6280.64,-1232.09z\"/><path class=\"fil0\" d=\"M9189.49 16611.15c271.47,-102.61 369.05,295.71 150.6,371.13 -277.52,95.81 -386.44,-281.98 -150.6,-371.13zm-1692.91 -3120.34c242.46,-128.43 388.81,238.19 185.65,350.5 -248.61,137.44 -418.77,-227.03 -185.65,-350.5zm294.72 641.83c191.44,-70.76 366.32,-290.59 288.02,-597.31 -52.7,-206.45 -248.63,-373.45 -496.84,-372.35 -580.07,2.57 -671.37,796.51 -201.35,965.02 5.99,533.96 1.84,407.88 285.62,691.26l979.86 977.81c113.53,117.76 447.51,438.43 408.9,535.57 -20.82,52.4 -354.51,176.36 -275.18,574.57 102.38,513.96 886.08,506.93 967.8,-22.89 59.77,-387.6 -258.04,-496.92 -280.46,-551.68 -5.52,-244.43 37.8,-253.52 -118.48,-391.68 -79.05,-69.89 -138.7,-153.59 -226.84,-249.27l-966.09 -965.11c-373.65,-373.11 -368.86,-286.36 -364.96,-593.94z\"/><path class=\"fil0\" d=\"M8303.96 9163.34c98.28,79.92 292.9,121.7 424.7,176.07 401.7,165.7 758.14,-138.21 1608.49,243.5 321.22,144.19 344.13,189.46 570.44,355.05 183.83,134.51 396.56,440.64 476.19,477.68 88.29,41.05 401.61,107.96 516.41,126.86 -107.34,-294.37 -396.73,-618.34 -575.22,-783.96 -523.38,-485.65 -1131.29,-777.21 -1890.23,-797.59 -305.19,-8.2 -903.11,60.41 -1130.78,202.39z\"/><path class=\"fil1\" d=\"M6340.3 14261.1c-255.23,100.12 -133.84,465.11 146.72,371.63 218.42,-72.78 110.03,-472.35 -146.72,-371.63z\"/><path class=\"fil1\" d=\"M9189.49 16611.15c-235.84,89.15 -126.92,466.94 150.6,371.13 218.45,-75.42 120.87,-473.74 -150.6,-371.13z\"/><path class=\"fil1\" d=\"M10451.41 16306.19c32.98,240.52 442.13,203.91 396.6,-68.75 -42.9,-256.85 -433.9,-203.22 -396.6,68.75z\"/><path class=\"fil1\" d=\"M8940.53 14133.98c-271.42,122.07 -114.45,462.15 139.94,368.92 232.64,-85.26 93.32,-473.82 -139.94,-368.92z\"/><path class=\"fil1\" d=\"M7611.38 16352.69c-281.35,151.29 -35.92,480.35 181.31,350.62 208.09,-124.28 35.03,-466.95 -181.31,-350.62z\"/><path class=\"fil1\" d=\"M7496.58 13490.81c-233.12,123.47 -62.96,487.94 185.65,350.5 203.16,-112.31 56.81,-478.93 -185.65,-350.5z\"/></g></svg>\n"
-  "  <h1>AirMQ SensorNode</h1>\n"
-  "  <button id=\"refresh-btn\" onclick=\"loadState()\">Refresh</button>\n"
-  "</header>\n"
-  "<main>\n"
-  "\n"
-  "  <!-- Status -->\n"
-  "  <section class=\"full\">\n"
-  "    <h2>Status</h2>\n"
-  "    <div class=\"stat-grid\">\n"
-  "      <div class=\"stat\"><div class=\"label\">Chip ID</div><div class=\"value\" id=\"s-chip\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">MCU</div><div class=\"value\" id=\"s-mcu\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">Flash</div><div class=\"value\" id=\"s-flash\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">IP</div><div class=\"value\" id=\"s-ip\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">WiFi</div><div class=\"value\" id=\"s-wifi\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">MQTT</div><div class=\"value\" id=\"s-mqtt\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">RSSI</div><div class=\"value\" id=\"s-rssi\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">Uptime</div><div class=\"value\" id=\"s-uptime\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">Active Sensors</div><div class=\"value\" id=\"s-sensors\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">Readings</div><div class=\"value\" id=\"s-readings\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">Free Heap</div><div class=\"value\" id=\"s-heap\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">Sample Num</div><div class=\"value\" id=\"s-sample\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">Tele Interval</div><div class=\"value\" id=\"s-tele\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">Build</div><div class=\"value\" id=\"s-build\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">Time</div><div class=\"value\" id=\"s-time\">—</div></div>\n"
-  "      <div class=\"stat\"><div class=\"label\">NTP</div><div class=\"value\" id=\"s-ntp\">—</div></div>\n"
-  "    </div>\n"
-  "  </section>\n"
-  "\n"
-  "  <!-- WiFi Setup -->\n"
-  "  <section id=\"wifi-section\" class=\"draggable-section\" draggable=\"true\" style=\"display:none\">\n"
-  "    <h2>WiFi Setup</h2>\n"
-  "    <div id=\"wifi-ap-banner\" style=\"display:none;margin-bottom:10px;padding:8px;background:#2a1500;border:1px solid #ffa726;border-radius:3px;color:#ffa726\">\n"
-  "      &#9888; Running in AP mode &mdash; configure WiFi below to enable MQTT uplink\n"
-  "    </div>\n"
-  "    <div style=\"display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start\">\n"
-  "      <div>\n"
-  "        <div style=\"font-size:10px;color:#aaa;margin-bottom:2px;text-transform:uppercase\">Primary</div>\n"
-  "        <div class=\"form-row\"><label>SSID</label><input type=\"text\" id=\"wifi-ssid\" placeholder=\"Network name\"><button class=\"btn\" onclick=\"scanWifi()\" style=\"margin-top:0;margin-left:4px\">Scan</button></div>\n"
-  "        <div class=\"form-row\"><label>Password</label><input type=\"password\" id=\"wifi-pass\" placeholder=\"leave empty for open\"></div>\n"
-  "        <div style=\"font-size:10px;color:#aaa;margin:4px 0 2px;text-transform:uppercase\">Backup</div>\n"
-  "        <div class=\"form-row\"><label>SSID</label><input type=\"text\" id=\"wifi-ssid2\" placeholder=\"Backup network\"></div>\n"
-  "        <div class=\"form-row\"><label>Password</label><input type=\"password\" id=\"wifi-pass2\" placeholder=\"leave empty for open\"></div>\n"
-  "        <button class=\"btn\" onclick=\"saveWifi()\">Save</button>\n"
-  "        <div class=\"msg\" id=\"wifi-msg\"></div>\n"
-  "      </div>\n"
-  "      <div id=\"wifi-scan-list\" style=\"display:none;flex:1;min-width:200px\">\n"
-  "        <div style=\"font-size:10px;color:#666;margin-bottom:4px\">Click to select:</div>\n"
-  "        <div id=\"wifi-nets\" style=\"display:flex;flex-wrap:wrap;gap:4px\"></div>\n"
-  "      </div>\n"
-  "    </div>\n"
-  "  </section>\n"
-  "\n"
-  "  <!-- MQTT Config -->\n"
-  "  <section id=\"mqtt-section\" class=\"draggable-section\" draggable=\"true\">\n"
-  "    <h2>MQTT Config</h2>\n"
-  "    <div class=\"form-row\"><label>Broker</label><input type=\"text\" id=\"mqtt-broker\" placeholder=\"hostname or IP\" style=\"width:200px\"></div>\n"
-  "    <div class=\"form-row\"><label>Port</label><input type=\"number\" id=\"mqtt-port\" min=\"1\" max=\"65535\"></div>\n"
-  "    <div class=\"form-row\"><label>Topic Prefix</label><input type=\"text\" id=\"mqtt-prefix\" placeholder=\"Sensors/\" style=\"width:140px\"></div>\n"
-  "    <div class=\"form-row\"><label>TLS / MQTTS</label><input type=\"checkbox\" id=\"mqtt-tls\"></div>\n"
-  "    <button class=\"btn\" onclick=\"saveMqttConfig()\">Save</button>\n"
-  "    <div class=\"msg\" id=\"mqtt-msg\"></div>\n"
-  "  </section>\n"
-  "\n"
-  "  <!-- Hardware Setup -->\n"
-  "  <section id=\"hw-section\" class=\"draggable-section\" draggable=\"true\">\n"
-  "    <h2>Hardware Setup</h2>\n"
-  "    <div class=\"form-row\"><label>I2C SDA</label><input type=\"number\" id=\"hw-sda\" min=\"-1\" max=\"48\"></div>\n"
-  "    <div class=\"form-row\"><label>I2C SCL</label><input type=\"number\" id=\"hw-scl\" min=\"-1\" max=\"48\"></div>\n"
-  "    <div class=\"form-row\"><label>UART RX</label><input type=\"number\" id=\"hw-urx\" min=\"-1\" max=\"48\"></div>\n"
-  "    <div class=\"form-row\"><label>UART TX</label><input type=\"number\" id=\"hw-utx\" min=\"-1\" max=\"48\"></div>\n"
-  "    <div class=\"form-row\"><label>1-Wire pin</label><input type=\"number\" id=\"hw-ow\" min=\"-1\" max=\"48\"></div>\n"
-  "    <div class=\"form-row\"><label>LED pin</label><input type=\"number\" id=\"hw-led\" min=\"-1\" max=\"48\" title=\"-1 = disabled\"></div>\n"
-  "    <button class=\"btn\" onclick=\"saveHwConfig()\">Save</button>\n"
-  "    <div class=\"msg\" id=\"hw-msg\"></div>\n"
-  "  </section>\n"
-  "\n"
-  "  <!-- Sensor Setup -->\n"
-  "  <section id=\"sensorsetup-section\" class=\"draggable-section\" draggable=\"true\">\n"
-  "    <h2>Sensor Setup</h2>\n"
-  "    <div id=\"sensor-cards\"></div>\n"
-  "    <div class=\"btn-row\">\n"
-  "      <button class=\"btn\" onclick=\"saveSensorSetup()\">Save</button>\n"
-  "      <a class=\"btn\" href=\"/api/config/export\">Download Config</a>\n"
-  "    </div>\n"
-  "    <div class=\"msg\" id=\"sensorsetup-msg\"></div>\n"
-  "  </section>\n"
-  "\n"
-  "  <!-- Commands -->\n"
-  "  <section id=\"cmd-section\" class=\"draggable-section\" draggable=\"true\">\n"
-  "    <h2>Commands</h2>\n"
-  "    <div class=\"btn-row\">\n"
-  "      <button class=\"btn danger\" onclick=\"sendCmd({cmd:'reboot'})\">Reboot</button>\n"
-  "      <button class=\"btn\" onclick=\"sendCmd({cmd:'telemetry'})\">Send Telemetry</button>\n"
-  "      <button class=\"btn\" id=\"debug-btn\" onclick=\"toggleDebug()\">Debug Log: OFF</button>\n"
-  "    </div>\n"
-  "    <div style=\"margin-top:10px;padding-top:8px;border-top:1px solid #2a2a2a\">\n"
-  "      <div style=\"font-size:10px;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px\">Factory Reset</div>\n"
-  "      <div class=\"form-row\"><label style=\"color:#888;width:auto;margin-right:8px\"><input type=\"checkbox\" id=\"reset-keep-wifi\" style=\"margin-right:4px\">Keep WiFi</label><label style=\"color:#888;width:auto\"><input type=\"checkbox\" id=\"reset-keep-mqtt\" style=\"margin-right:4px\">Keep MQTT</label></div>\n"
-  "      <button class=\"btn danger\" onclick=\"doFactoryReset()\" style=\"margin-top:6px\">Factory Reset</button>\n"
-  "    </div>\n"
-  "    <div class=\"msg\" id=\"cmd-msg\"></div>\n"
-  "  </section>\n"
-  "\n"
-  "  <!-- Firmware Update -->\n"
-  "  <section id=\"ota-section\" class=\"full draggable-section\" draggable=\"true\">\n"
-  "    <h2>Firmware Update</h2>\n"
-  "    <div style=\"display:flex;align-items:center;gap:8px\">\n"
-  "      <input type=\"file\" id=\"ota-file\" accept=\".bin\" style=\"font-size:12px;font-family:monospace;color:#ccc;background:none;border:none;padding:0;flex:1;min-width:0\">\n"
-  "      <button class=\"btn\" onclick=\"doOta()\" style=\"margin-top:0;flex-shrink:0\">Flash &amp; Reboot</button>\n"
-  "    </div>\n"
-  "    <div style=\"display:flex;align-items:center;gap:8px;margin-top:8px\">\n"
-  "      <span style=\"flex:1;font-size:12px;color:#888\">Download from OTA server — watch log for progress</span>\n"
-  "      <button class=\"btn\" onclick=\"postJson('/api/cmd',{cmd:'otaCheck'},'ota-msg')\" style=\"margin-top:0;flex-shrink:0\">Check OTA Server</button>\n"
-  "    </div>\n"
-  "    <progress id=\"ota-progress\" value=\"0\" max=\"100\" style=\"width:100%;height:6px;display:none;margin-top:6px\"></progress>\n"
-  "    <div class=\"msg\" id=\"ota-msg\"></div>\n"
-  "  </section>\n"
-  "\n"
-  "  <!-- Utils -->\n"
-  "  <section id=\"utils-section\" class=\"draggable-section\" draggable=\"true\">\n"
-  "    <h2>Utils</h2>\n"
-  "    <div style=\"font-size:10px;color:#666;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px\">I2C Scanner</div>\n"
-  "    <button class=\"btn\" onclick=\"runI2cScan()\">Scan I2C Bus</button>\n"
-  "    <div id=\"i2c-result\" style=\"margin-top:8px;font-size:12px;min-height:20px\"></div>\n"
-  "  </section>\n"
-  "\n"
-  "  <!-- Features -->\n"
-  "  <section id=\"features-section\" class=\"draggable-section\" draggable=\"true\">\n"
-  "    <h2>Features</h2>\n"
-  "    <div class=\"form-row\"><label>WebSocket Log (port 81)</label><input type=\"checkbox\" id=\"feat-wslog\" checked></div>\n"
-  "    <div class=\"form-row\"><label>Web UI (port 80)</label><input type=\"checkbox\" id=\"feat-web\" checked></div>\n"
-  "    <div id=\"feat-web-warn\" style=\"display:none;font-size:11px;color:#e57373;margin:2px 0 6px 90px\">Disabling requires MQTT cmd to re-enable</div>\n"
-  "    <button class=\"btn\" onclick=\"saveFeatures()\">Apply</button>\n"
-  "    <div class=\"msg\" id=\"feat-msg\"></div>\n"
-  "  </section>\n"
-  "\n"
-  "  <!-- Log Stream -->\n"
-  "  <section id=\"log-section\" class=\"full\">\n"
-  "    <h2>Log Stream</h2>\n"
-  "    <div class=\"ws-status\"><span id=\"ws-dot\">&#9679;</span> <span id=\"ws-label\">disconnected</span></div>\n"
-  "    <div id=\"log\"></div>\n"
-  "  </section>\n"
-  "\n"
-  "</main>\n"
-  "<script>\n"
-  "var MAX_LOG = 200;\n"
-  "\n"
-  "// ── State ──────────────────────────────────────────────────────────────────────\n"
-  "function loadState() {\n"
-  "  fetch('/api/state')\n"
-  "    .then(function(r){return r.json()})\n"
-  "    .then(function(d){\n"
-  "      set('s-chip',   d.chipId);\n"
-  "      set('s-mcu',    d.mcu || '—');\n"
-  "      set('s-flash',  d.flashKB ? (d.flashKB >= 1024 ? (d.flashKB/1024) + ' MB' : d.flashKB + ' KB') : '—');\n"
-  "      set('s-ip',     d.ipAddress || '—');\n"
-  "      set('s-wifi',   d.apMode ? '<span class=\"warn\">&#9679; AP mode</span>'\n"
-  "                               : (d.wifiConnected ? '<span class=\"ok\">&#9679; connected</span>'\n"
-  "                                                  : '<span class=\"err\">&#9679; offline</span>'));\n"
-  "      set('s-mqtt',   d.mqttConnected ? '<span class=\"ok\">&#9679; connected</span>' : '<span class=\"err\">&#9679; offline</span>');\n"
-  "      set('s-rssi',   d.apMode ? '—' : (d.wifiRSSI + ' dBm'));\n"
-  "      set('s-uptime', d.uptime + ' min');\n"
-  "      set('s-sensors', d.sensorsActive);\n"
-  "      set('s-readings', d.readingCount);\n"
-  "      set('s-heap',   Math.round(d.freeHeap/1024) + ' KB');\n"
-  "      set('s-sample', d.sampleNum);\n"
-  "      set('s-tele',   d.teleInterval + ' min');\n"
-  "      set('s-build',  d.build);\n"
-  "      if (d.ntpSynced && d.epochTime) {\n"
-  "        var dt = new Date(d.epochTime*1000);\n"
-  "        set('s-time', pad(dt.getHours())+':'+pad(dt.getMinutes())+':'+pad(dt.getSeconds()));\n"
-  "        set('s-ntp',  '<span class=\"ok\">synced</span>');\n"
-  "      } else {\n"
-  "        set('s-time', '—');\n"
-  "        set('s-ntp',  '<span class=\"err\">not synced</span>');\n"
-  "      }\n"
-  "      debugOn = !!d.debugLog;\n"
-  "      var btn = document.getElementById('debug-btn');\n"
-  "      btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');\n"
-  "      btn.style.color = debugOn ? '#4caf50' : '';\n"
-  "      btn.style.borderColor = debugOn ? '#4caf50' : '';\n"
-  "    })\n"
-  "    .catch(function(){set('s-wifi','<span class=\"err\">fetch failed</span>')});\n"
-  "}\n"
-  "\n"
-  "function set(id, html) {\n"
-  "  var el = document.getElementById(id);\n"
-  "  if (el) el.innerHTML = html;\n"
-  "}\n"
-  "\n"
-  "// ── WiFi ──────────────────────────────────────────────────────────────────────\n"
-  "function loadWifi() {\n"
-  "  fetch('/api/wifi').then(function(r){return r.json()}).then(function(d){\n"
-  "    document.getElementById('wifi-section').style.display = 'block';\n"
-  "    document.getElementById('wifi-ap-banner').style.display = d.apMode ? 'block' : 'none';\n"
-  "    if (d.ssid)  document.getElementById('wifi-ssid').value  = d.ssid;\n"
-  "    if (d.ssid2) document.getElementById('wifi-ssid2').value = d.ssid2;\n"
-  "  }).catch(function(){});\n"
-  "}\n"
-  "\n"
-  "function scanWifi() {\n"
-  "  showMsg('wifi-msg','Scanning...',true);\n"
-  "  document.getElementById('wifi-scan-list').style.display = 'none';\n"
-  "  fetch('/api/wifi/scan').then(function(r){return r.json()}).then(function(nets){\n"
-  "    var c = document.getElementById('wifi-nets');\n"
-  "    c.innerHTML = '';\n"
-  "    nets.sort(function(a,b){return b.rssi-a.rssi}).forEach(function(n){\n"
-  "      var b = document.createElement('button');\n"
-  "      b.className = 'btn'; b.style.margin = '0';\n"
-  "      b.textContent = n.ssid+' ('+n.rssi+' dBm'+(n.secure?' \\uD83D\\uDD12':'')+')';\n"
-  "      b.onclick = function(){ document.getElementById('wifi-ssid').value=n.ssid; document.getElementById('wifi-pass').focus(); };\n"
-  "      c.appendChild(b);\n"
-  "    });\n"
-  "    document.getElementById('wifi-scan-list').style.display = nets.length ? 'block' : 'none';\n"
-  "    showMsg('wifi-msg', nets.length+' networks found', true);\n"
-  "  }).catch(function(){showMsg('wifi-msg','Scan failed',false)});\n"
-  "}\n"
-  "\n"
-  "function saveWifi() {\n"
-  "  var ssid = document.getElementById('wifi-ssid').value.trim();\n"
-  "  if (!ssid) { showMsg('wifi-msg','SSID required',false); return; }\n"
-  "  fetch('/api/wifi', {method:'POST', headers:{'Content-Type':'application/json'},\n"
-  "    body: JSON.stringify({ssid:ssid, pass:document.getElementById('wifi-pass').value,\n"
-  "      ssid2:document.getElementById('wifi-ssid2').value.trim(),\n"
-  "      pass2:document.getElementById('wifi-pass2').value})\n"
-  "  }).then(function(r){return r.json()}).then(function(d){\n"
-  "    showMsg('wifi-msg',d.ok?(d.msg||'Saved'):('Error: '+d.error),d.ok);\n"
-  "    if(d.ok) showToast('Saved — reboot to apply');\n"
-  "  }).catch(function(){showMsg('wifi-msg','Request failed',false)});\n"
-  "}\n"
-  "\n"
-  "// ── MQTT Config ────────────────────────────────────────────────────────────────\n"
-  "function loadMqttConfig() {\n"
-  "  fetch('/api/mqtt/config').then(function(r){return r.json()}).then(function(d){\n"
-  "    document.getElementById('mqtt-broker').value = d.broker || '';\n"
-  "    document.getElementById('mqtt-port').value   = d.port   || 8883;\n"
-  "    document.getElementById('mqtt-prefix').value = d.prefix || 'Sensors/';\n"
-  "    document.getElementById('mqtt-tls').checked  = !!d.tls;\n"
-  "  }).catch(function(){});\n"
-  "}\n"
-  "\n"
-  "function saveMqttConfig() {\n"
-  "  var body = {\n"
-  "    broker: document.getElementById('mqtt-broker').value.trim(),\n"
-  "    port:   parseInt(document.getElementById('mqtt-port').value),\n"
-  "    prefix: document.getElementById('mqtt-prefix').value,\n"
-  "    tls:    document.getElementById('mqtt-tls').checked\n"
-  "  };\n"
-  "  if (!body.broker) { showMsg('mqtt-msg','Broker required',false); return; }\n"
-  "  fetch('/api/mqtt/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})\n"
-  "    .then(function(r){return r.json()})\n"
-  "    .then(function(d){\n"
-  "      showMsg('mqtt-msg', d.ok ? (d.msg||'Saved') : ('Error: '+d.error), d.ok);\n"
-  "      if(d.ok) showToast('Saved — reboot to apply');\n"
-  "    }).catch(function(){showMsg('mqtt-msg','Request failed',false)});\n"
-  "}\n"
-  "\n"
-  "// ── Hardware Setup ─────────────────────────────────────────────────────────────\n"
-  "function loadHwConfig() {\n"
-  "  fetch('/api/hw/config').then(function(r){return r.json()}).then(function(d){\n"
-  "    document.getElementById('hw-sda').value      = d.i2c_sda  !== undefined ? d.i2c_sda  : 4;\n"
-  "    document.getElementById('hw-scl').value      = d.i2c_scl  !== undefined ? d.i2c_scl  : 5;\n"
-  "    document.getElementById('hw-urx').value      = d.uart_rx  !== undefined ? d.uart_rx  : 3;\n"
-  "    document.getElementById('hw-utx').value      = d.uart_tx  !== undefined ? d.uart_tx  : 1;\n"
-  "    document.getElementById('hw-ow').value       = d.onewire  !== undefined ? d.onewire  : 2;\n"
-  "    document.getElementById('hw-led').value      = d.led_pin  !== undefined ? d.led_pin  : -1;\n"
-  "  }).catch(function(){});\n"
-  "}\n"
-  "\n"
-  "function saveHwConfig() {\n"
-  "  var body = {\n"
-  "    i2c_sda:  parseInt(document.getElementById('hw-sda').value),\n"
-  "    i2c_scl:  parseInt(document.getElementById('hw-scl').value),\n"
-  "    uart_rx:  parseInt(document.getElementById('hw-urx').value),\n"
-  "    uart_tx:  parseInt(document.getElementById('hw-utx').value),\n"
-  "    onewire:  parseInt(document.getElementById('hw-ow').value),\n"
-  "    led_pin:  parseInt(document.getElementById('hw-led').value)\n"
-  "  };\n"
-  "  fetch('/api/hw/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})\n"
-  "    .then(function(r){return r.json()})\n"
-  "    .then(function(d){\n"
-  "      showMsg('hw-msg', d.ok ? (d.msg||'Saved') : ('Error: '+d.error), d.ok);\n"
-  "      if(d.ok) showToast('Saved — reboot to apply');\n"
-  "    }).catch(function(){showMsg('hw-msg','Request failed',false)});\n"
-  "}\n"
-  "\n"
-  "// ── Sensor Setup ───────────────────────────────────────────────────────────────\n"
-  "var SENSOR_TYPES = [\n"
-  "  {type:'bme280',  label:'BME280',       fields:[{key:'addr',label:'I2C addr',def:0x76}]},\n"
-  "  {type:'bmp280',  label:'BMP280',       hidden:true, fields:[{key:'addr',label:'I2C addr',def:0x76}]},\n"
-  "  {type:'bmp580',  label:'BMP580',       fields:[{key:'addr',label:'I2C addr',def:0x46}]},\n"
-  "  {type:'sht30',   label:'SHT3x',        fields:[{key:'addr',label:'I2C addr',def:0x44}]},\n"
-  "  {type:'sht4x',   label:'SHT4x',        fields:[{key:'addr',label:'I2C addr',def:0x44}]},\n"
-  "  {type:'htu21d',  label:'HTU21D',       fixedAddr:0x40, fields:[]},\n"
-  "  {type:'scd4x',   label:'SCD4x',        fixedAddr:0x62, fields:[]},\n"
-  "  {type:'sgp4x',   label:'SGP4x',        fixedAddr:0x59, fields:[]},\n"
-  "  {type:'xdb401',  label:'XDB401',       fields:[{key:'addr',label:'I2C addr',def:0x7F},{key:'fullscale_pa',label:'Full scale (MPa)',def:500000,fmt:'num',div:1e6}]},\n"
-  "  {type:'ds18b20', label:'DS18B20',      fields:[]},\n"
-  "  {type:'pms7003', label:'PMS7003',      fields:[]},\n"
-  "];\n"
-  "\n"
-  "var sensorSetupData = [];\n"
-  "\n"
-  "function renderSensorCards(data) {\n"
-  "  var container = document.getElementById('sensor-cards');\n"
-  "  container.innerHTML = '';\n"
-  "  SENSOR_TYPES.forEach(function(st) {\n"
-  "    if (st.hidden) return;\n"
-  "    var entry = data.find(function(e){return e.type===st.type}) || {type:st.type,enabled:false};\n"
-  "    var card = document.createElement('div');\n"
-  "    card.className = 'sensor-card';\n"
-  "    var headHtml = '<div class=\"sc-head\">'\n"
-  "      +'<input type=\"checkbox\" data-type=\"'+st.type+'\" '+(entry.enabled?'checked':'')+'>'\n"
-  "      +'<span class=\"sc-type\">'+st.label+'</span></div>';\n"
-  "    var fieldsHtml = '<div class=\"sc-fields\">';\n"
-  "    if (st.fixedAddr !== undefined) {\n"
-  "      fieldsHtml += '<span style=\"color:#555;font-size:10px\">0x'+st.fixedAddr.toString(16)+'</span>';\n"
-  "    }\n"
-  "    st.fields.forEach(function(f){\n"
-  "      var val = entry[f.key] !== undefined ? entry[f.key] : f.def;\n"
-  "      if (f.fmt === 'num') {\n"
-  "        var dispVal = f.div ? val / f.div : val;\n"
-  "        fieldsHtml += '<div class=\"sc-field\"><span>'+f.label+'</span>'\n"
-  "          +'<input type=\"number\" data-type=\"'+st.type+'\" data-key=\"'+f.key+'\" data-fmt=\"num\"'+(f.div?' data-div=\"'+f.div+'\"':'')+' value=\"'+dispVal+'\" step=\"any\" style=\"width:64px\"></div>';\n"
-  "      } else {\n"
-  "        var hexVal = '0x' + val.toString(16);\n"
-  "        fieldsHtml += '<div class=\"sc-field\"><span>'+f.label+'</span>'\n"
-  "          +'<input type=\"text\" data-type=\"'+st.type+'\" data-key=\"'+f.key+'\" value=\"'+hexVal+'\" style=\"width:52px\" oninput=\"updateHexSpan(this)\">'\n"
-  "          +'<span style=\"color:#555;font-size:10px\">('+val+')</span></div>';\n"
-  "      }\n"
-  "    });\n"
-  "    fieldsHtml += '</div>';\n"
-  "    card.innerHTML = headHtml + fieldsHtml;\n"
-  "    container.appendChild(card);\n"
-  "  });\n"
-  "}\n"
-  "\n"
-  "function loadSensorSetup() {\n"
-  "  fetch('/api/sensors/setup').then(function(r){return r.json()}).then(function(d){\n"
-  "    sensorSetupData = Array.isArray(d) ? d : [];\n"
-  "    renderSensorCards(sensorSetupData);\n"
-  "  }).catch(function(){renderSensorCards([])});\n"
-  "}\n"
-  "\n"
-  "function saveSensorSetup() {\n"
-  "  var result = [];\n"
-  "  SENSOR_TYPES.forEach(function(st) {\n"
-  "    if (st.hidden) {\n"
-  "      // preserve existing saved state, don't overwrite with UI defaults\n"
-  "      var existing = sensorSetupData.find(function(e){return e.type===st.type});\n"
-  "      if (existing) result.push(existing);\n"
-  "      return;\n"
-  "    }\n"
-  "    var cb  = document.querySelector('input[type=checkbox][data-type=\"'+st.type+'\"]');\n"
-  "    var obj = {type: st.type, enabled: cb ? cb.checked : false};\n"
-  "    st.fields.forEach(function(f){\n"
-  "      var inp = document.querySelector('input[data-type=\"'+st.type+'\"][data-key=\"'+f.key+'\"]');\n"
-  "      if (inp) obj[f.key] = f.fmt === 'num' ? parseFloat(inp.value) * (f.div || 1) : parseInt(inp.value);\n"
-  "    });\n"
-  "    result.push(obj);\n"
-  "  });\n"
-  "  // Check for I2C address conflicts among enabled sensors\n"
-  "  var addrMap = {};\n"
-  "  var conflicts = [];\n"
-  "  result.forEach(function(obj) {\n"
-  "    if (!obj.enabled) return;\n"
-  "    var st = SENSOR_TYPES.find(function(s){return s.type===obj.type});\n"
-  "    if (!st) return;\n"
-  "    var addr = obj.addr !== undefined ? obj.addr : st.fixedAddr;\n"
-  "    if (addr === undefined) return;\n"
-  "    if (addrMap[addr]) {\n"
-  "      conflicts.push('0x'+addr.toString(16)+': '+addrMap[addr]+' & '+st.label);\n"
-  "    } else {\n"
-  "      addrMap[addr] = st.label;\n"
-  "    }\n"
-  "  });\n"
-  "  if (conflicts.length) {\n"
-  "    showMsg('sensorsetup-msg', 'Address conflict: '+conflicts.join('; '), false);\n"
-  "    return;\n"
-  "  }\n"
-  "  fetch('/api/sensors/setup', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(result)})\n"
-  "    .then(function(r){return r.json()})\n"
-  "    .then(function(d){showMsg('sensorsetup-msg', d.ok ? 'Saved.' : ('Error: '+d.error), d.ok)})\n"
-  "    .catch(function(){showMsg('sensorsetup-msg','Request failed',false)});\n"
-  "}\n"
-  "\n"
-  "// ── Commands ───────────────────────────────────────────────────────────────────\n"
-  "function sendCmd(body) { postJson('/api/cmd', body, 'cmd-msg'); }\n"
-  "\n"
-  "function doFactoryReset() {\n"
-  "  var keepWifi = document.getElementById('reset-keep-wifi').checked;\n"
-  "  var keepMqtt = document.getElementById('reset-keep-mqtt').checked;\n"
-  "  var what = ['hw config', 'sensors'];\n"
-  "  if (!keepWifi) what.push('WiFi');\n"
-  "  if (!keepMqtt) what.push('MQTT');\n"
-  "  if (!confirm('Reset ' + what.join(', ') + ' and reboot?')) return;\n"
-  "  fetch('/api/config/reset', {method:'POST', headers:{'Content-Type':'application/json'},\n"
-  "    body: JSON.stringify({preserve_wifi: keepWifi, preserve_mqtt: keepMqtt})})\n"
-  "    .then(function(r){return r.json()})\n"
-  "    .then(function(d){showMsg('cmd-msg', d.ok ? (d.msg||'Done') : ('Error: '+d.error), d.ok)})\n"
-  "    .catch(function(){showMsg('cmd-msg','Request failed',false)});\n"
-  "}\n"
-  "\n"
-  "var debugOn = false;\n"
-  "function toggleDebug() {\n"
-  "  debugOn = !debugOn;\n"
-  "  postJson('/api/cmd', {debugLog: debugOn}, 'cmd-msg');\n"
-  "  var btn = document.getElementById('debug-btn');\n"
-  "  btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');\n"
-  "  btn.style.color = debugOn ? '#4caf50' : '';\n"
-  "  btn.style.borderColor = debugOn ? '#4caf50' : '';\n"
-  "}\n"
-  "\n"
-  "// ── Features ───────────────────────────────────────────────────────────────────\n"
-  "function loadFeatures() {\n"
-  "  fetch('/api/features')\n"
-  "    .then(function(r){return r.json()})\n"
-  "    .then(function(d){\n"
-  "      document.getElementById('feat-wslog').checked = d.wsLog !== false;\n"
-  "      document.getElementById('feat-web').checked   = d.web   !== false;\n"
-  "    })\n"
-  "    .catch(function(){});\n"
-  "}\n"
-  "document.getElementById('feat-web').addEventListener('change', function() {\n"
-  "  document.getElementById('feat-web-warn').style.display = this.checked ? 'none' : 'block';\n"
-  "});\n"
-  "function saveFeatures() {\n"
-  "  var web   = document.getElementById('feat-web').checked;\n"
-  "  var wslog = document.getElementById('feat-wslog').checked;\n"
-  "  if (!web && !confirm('Disabling the web UI requires MQTT to re-enable it. Continue?')) return;\n"
-  "  fetch('/api/features', {method:'POST', headers:{'Content-Type':'application/json'},\n"
-  "    body: JSON.stringify({web: web, wsLog: wslog})})\n"
-  "    .then(function(r){return r.json()})\n"
-  "    .then(function(d){\n"
-  "      showMsg('feat-msg', d.ok ? (d.msg||'Saved') : ('Error: '+d.error), d.ok);\n"
-  "      if(d.ok) showToast('Saved — reboot to apply');\n"
-  "    }).catch(function(){showMsg('feat-msg','Request failed',false)});\n"
-  "}\n"
-  "\n"
-  "// ── OTA ────────────────────────────────────────────────────────────────────────\n"
-  "function doOta() {\n"
-  "  var file = document.getElementById('ota-file').files[0];\n"
-  "  if (!file) { showMsg('ota-msg','Select a .bin file first',false); return; }\n"
-  "  var prog = document.getElementById('ota-progress');\n"
-  "  prog.value = 0; prog.style.display = 'block';\n"
-  "  var fd = new FormData();\n"
-  "  fd.append('firmware', file, file.name);\n"
-  "  var xhr = new XMLHttpRequest();\n"
-  "  xhr.upload.onprogress = function(e){ if(e.lengthComputable) prog.value=Math.round(e.loaded/e.total*100); };\n"
-  "  xhr.onload = function(){\n"
-  "    prog.value=100;\n"
-  "    try { var d=JSON.parse(xhr.responseText); showMsg('ota-msg',d.ok?'Flashed — rebooting':('Error: '+d.error),d.ok); }\n"
-  "    catch(e){ showMsg('ota-msg','Done',true); }\n"
-  "    prog.style.display = 'none';\n"
-  "  };\n"
-  "  xhr.onerror = function(){ showMsg('ota-msg','Upload failed',false); prog.style.display='none'; };\n"
-  "  xhr.open('POST','/api/ota');\n"
-  "  xhr.send(fd);\n"
-  "}\n"
-  "\n"
-  "// ── Utils ──────────────────────────────────────────────────────────────────────\n"
-  "function runI2cScan() {\n"
-  "  var el = document.getElementById('i2c-result');\n"
-  "  el.innerHTML = '<span style=\"color:#666\">Scanning...</span>';\n"
-  "  fetch('/api/utils/i2c-scan')\n"
-  "    .then(function(r){return r.json()})\n"
-  "    .then(function(d){\n"
-  "      var devs = d.devices || [];\n"
-  "      if (!devs.length) {\n"
-  "        el.innerHTML = '<span class=\"warn\">No devices found</span>';\n"
-  "        return;\n"
-  "      }\n"
-  "      el.innerHTML = devs.map(function(x){\n"
-  "        return '<span style=\"background:#1a2a1a;border:1px solid #2a3a2a;border-radius:2px;padding:2px 7px;margin-right:4px;color:#4caf50\">'\n"
-  "          + x.hex + '</span>';\n"
-  "      }).join('');\n"
-  "    })\n"
-  "    .catch(function(){el.innerHTML='<span class=\"err\">Scan failed</span>';});\n"
-  "}\n"
-  "\n"
-  "// ── Helpers ────────────────────────────────────────────────────────────────────\n"
-  "function postJson(url, body, msgId) {\n"
-  "  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})\n"
-  "    .then(function(r){return r.json()})\n"
-  "    .then(function(d){showMsg(msgId, d.ok?'OK':('Error: '+d.error), d.ok)})\n"
-  "    .catch(function(){showMsg(msgId,'Request failed',false)});\n"
-  "}\n"
-  "\n"
-  "function showMsg(id, text, ok) {\n"
-  "  var el = document.getElementById(id);\n"
-  "  if (!el) return;\n"
-  "  el.innerHTML = '<span class=\"'+(ok?'ok':'err')+'\">'+text+'</span>';\n"
-  "  setTimeout(function(){el.textContent='';},3000);\n"
-  "}\n"
-  "\n"
-  "function showToast(msg) {\n"
-  "  var t = document.getElementById('toast');\n"
-  "  t.textContent = msg;\n"
-  "  t.classList.add('show');\n"
-  "  clearTimeout(t._tid);\n"
-  "  t._tid = setTimeout(function(){ t.classList.remove('show'); }, 4000);\n"
-  "}\n"
-  "\n"
-  "function updateHexSpan(inp) {\n"
-  "  var v = parseInt(inp.value);\n"
-  "  var span = inp.nextElementSibling;\n"
-  "  if (span && !isNaN(v)) span.textContent = '('+v+')';\n"
-  "}\n"
-  "\n"
-  "function pad(n){ return n<10?'0'+n:''+n; }\n"
-  "function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }\n"
-  "\n"
-  "// ── WebSocket log ──────────────────────────────────────────────────────────────\n"
-  "function connectWs() {\n"
-  "  var wsUrl = 'ws://'+location.hostname+':81';\n"
-  "  var ws = new WebSocket(wsUrl);\n"
-  "  var dot = document.getElementById('ws-dot');\n"
-  "  var lbl = document.getElementById('ws-label');\n"
-  "  ws.onopen  = function(){ dot.className='ws-ok'; lbl.textContent='connected to '+wsUrl; };\n"
-  "  ws.onclose = function(){ dot.className='ws-err'; lbl.textContent='disconnected — retrying in 3s'; setTimeout(connectWs,3000); };\n"
-  "  ws.onerror = function(){ ws.close(); };\n"
-  "  ws.onmessage = function(evt){\n"
-  "    var d; try{d=JSON.parse(evt.data);}catch(e){return;}\n"
-  "    if (d.l === 'otapct') {\n"
-  "      var pct = parseInt(d.m);\n"
-  "      var prog = document.getElementById('ota-progress');\n"
-  "      prog.style.display = 'block';\n"
-  "      prog.value = pct;\n"
-  "      if (pct >= 100) setTimeout(function(){ prog.style.display='none'; }, 2000);\n"
-  "      d = {t: d.t, m: 'OTA: ' + pct + '%', l: 'info'};\n"
-  "    }\n"
-  "    var log = document.getElementById('log');\n"
-  "    var row = document.createElement('div');\n"
-  "    row.className = 'log-entry log-'+(d.l||'info');\n"
-  "    var ts = Math.floor((d.t||0)/1000);\n"
-  "    var h=Math.floor(ts/3600), m=Math.floor((ts%3600)/60), s=ts%60;\n"
-  "    if(!d.l) console.warn('[WS] msg without l key:', evt.data);\n"
-  "    row.innerHTML = '<span class=\"log-ts\">'+pad(h)+':'+pad(m)+':'+pad(s)+'</span>'\n"
-  "                  + '<span class=\"warn\">['+(d.l||'info')+']</span> '+escHtml(d.m||'');\n"
-  "    log.appendChild(row);\n"
-  "    while(log.children.length>MAX_LOG) log.removeChild(log.firstChild);\n"
-  "    log.scrollTop = log.scrollHeight;\n"
-  "  };\n"
-  "}\n"
-  "\n"
-  "// ── Init ───────────────────────────────────────────────────────────────────────\n"
-  "loadState();\n"
-  "loadWifi();\n"
-  "loadMqttConfig();\n"
-  "loadHwConfig();\n"
-  "loadSensorSetup();\n"
-  "loadFeatures();\n"
-  "connectWs();\n"
-  "setInterval(loadState, 15000);\n"
-  "\n"
-  "// ── Drag & drop ────────────────────────────────────────────────────────────────\n"
-  "(function(){\n"
-  "  var src=null, fromHandle=false;\n"
-  "  document.addEventListener('mouseup',function(){fromHandle=false;});\n"
-  "  function ds(e){if(!fromHandle){e.preventDefault();return;}src=this;setTimeout(function(){if(src)src.classList.add('dragging');},0);}\n"
-  "  function de(){fromHandle=false;this.classList.remove('dragging');document.querySelectorAll('.drag-over').forEach(function(x){x.classList.remove('drag-over');});var o=[];document.querySelectorAll('main .draggable-section').forEach(function(x){if(x.id)o.push(x.id);});localStorage.setItem('sOrder',JSON.stringify(o));}\n"
-  "  function dv(e){e.preventDefault();}\n"
-  "  function den(e){if(this!==src)this.classList.add('drag-over');}\n"
-  "  function dl(e){if(!this.contains(e.relatedTarget))this.classList.remove('drag-over');}\n"
-  "  function dp(e){e.preventDefault();this.classList.remove('drag-over');if(!src||this===src)return;var r=this.getBoundingClientRect();this.parentNode.insertBefore(src,e.clientY<r.top+r.height/2?this:this.nextSibling);}\n"
-  "  document.querySelectorAll('.draggable-section').forEach(function(el){\n"
-  "    var h2=el.querySelector('h2');\n"
-  "    if(h2) h2.addEventListener('mousedown',function(){fromHandle=true;});\n"
-  "    el.addEventListener('dragstart',ds);el.addEventListener('dragend',de);\n"
-  "    el.addEventListener('dragover',dv);el.addEventListener('dragenter',den);\n"
-  "    el.addEventListener('dragleave',dl);el.addEventListener('drop',dp);\n"
-  "  });\n"
-  "  var stored=localStorage.getItem('sOrder');\n"
-  "  if(stored){var anchor=document.getElementById('log-section');try{JSON.parse(stored).forEach(function(id){var el=document.getElementById(id);if(el)anchor.parentNode.insertBefore(el,anchor);});}catch(e){}}\n"
-  "})();\n"
-  "\n"
-  "// ── Section resize ─────────────────────────────────────────────────────────────\n"
-  "(function(){\n"
-  "  function getSpan(el){return parseInt(el.getAttribute('data-span')||(el.classList.contains('full')?'3':'1'));}\n"
-  "  function setSpan(el,n){n=Math.max(1,Math.min(3,n));el.setAttribute('data-span',n);el.style.gridColumn=n>1?'span '+n:'';if(n===3)el.classList.add('full');else el.classList.remove('full');}\n"
-  "  function saveSpans(){var s={};document.querySelectorAll('.draggable-section').forEach(function(x){if(x.id)s[x.id]=getSpan(x);});localStorage.setItem('sSpans',JSON.stringify(s));}\n"
-  "  document.querySelectorAll('.draggable-section').forEach(function(el){\n"
-  "    setSpan(el,getSpan(el));\n"
-  "    var g=document.createElement('div');g.className='sec-grip';g.textContent='⣿';el.appendChild(g);\n"
-  "    g.addEventListener('mousedown',function(e){\n"
-  "      e.stopPropagation();e.preventDefault();\n"
-  "      var main=document.querySelector('main');\n"
-  "      var cw=parseFloat(getComputedStyle(main).gridTemplateColumns.split(' ')[0]);\n"
-  "      var sx=e.clientX,ss=getSpan(el);\n"
-  "      function mv(e){setSpan(el,ss+Math.round((e.clientX-sx)/(cw+12)));}\n"
-  "      function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);saveSpans();}\n"
-  "      document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);\n"
-  "    });\n"
-  "  });\n"
-  "  var s=localStorage.getItem('sSpans');\n"
-  "  if(s){try{var sp=JSON.parse(s);Object.keys(sp).forEach(function(id){var el=document.getElementById(id);if(el)setSpan(el,sp[id]);});}catch(e){}}\n"
-  "})();\n"
-  "</script>\n"
-  "</body>\n"
-  "</html>\n"
-  "\n";
+static const char INDEX_HTML[] PROGMEM = R"=====(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AirMQ SensorNode</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --font:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --bg:#eef2f7;--bg-card:#fff;--bg-input:#f4f7fa;--bg-stat:#f8fafc;
+  --border:#dde4ed;--border-h2:#d0dae8;
+  --text:#1a2a3a;--text-muted:#5a7080;--text-dim:#8aa0b0;
+  --accent:#0090c8;--accent-hover:#007aab;--accent-text:#fff;
+  --header-bg:#0090c8;--header-text:#fff;--header-border:rgba(0,0,0,.12);
+  --devname:rgba(255,255,255,.75);
+  --btn-bg:#0090c8;--btn-border:#0090c8;--btn-text:#fff;--btn-hover:#007aab;
+  --btn-danger-bg:#fff0f0;--btn-danger-color:#c62828;--btn-danger-border:#ef9a9a;--btn-danger-hover:#fde8e8;
+  --log-bg:#f4f7fa;--log-border:#dde4ed;
+  --log-info:#0277bd;--log-warn:#e65100;--log-error:#c62828;--log-debug:#90a0b0;--log-ts:#b0c0d0;
+  --ok:#2e7d32;--err:#c62828;--warn:#e65100;
+  --ap-banner-bg:#fff8e1;
+  --drag-handle:#c8d8e8;--drag-over-outline:#0090c8;
+  --grip-color:#c8d8e8;--grip-hover:#0090c8;
+  --pass-toggle:#8aa0b0;--pass-toggle-hover:#0090c8;
+  --ws-status:#8aa0b0;--ws-ok:#2e7d32;--ws-err:#c62828;
+  --shadow:0 1px 4px rgba(0,60,120,.08),0 0 0 1px var(--border);
+  --sensor-card-bg:#f8fafc;
+  --sc-values-bg:#f0fff4;--sc-values-border:#c8e6c9;
+  --sc-val-k:#8aa0b0;--sc-val-v:#2e7d32;
+  --summary-color:#8aa0b0;
+  --cmd-divider:var(--border);
+  --toast-bg:#f1f8e9;--toast-border:#8bc34a;--toast-color:#558b2f;
+}
+body.dark{
+  --font:monospace;
+  --bg:#111;--bg-card:#1a1a1a;--bg-input:#111;--bg-stat:#111;
+  --border:#2a2a2a;--border-h2:#2a2a2a;
+  --text:#ccc;--text-muted:#888;--text-dim:#666;
+  --accent:#7eb8f7;--accent-hover:#2d4a7a;--accent-text:#7eb8f7;
+  --header-bg:#1a1a2e;--header-text:#7eb8f7;--header-border:#333;
+  --devname:#aaa;
+  --btn-bg:#23395d;--btn-border:#7eb8f7;--btn-text:#7eb8f7;--btn-hover:#2d4a7a;
+  --btn-danger-bg:#2a1515;--btn-danger-color:#e57373;--btn-danger-border:#e57373;--btn-danger-hover:#3a1f1f;
+  --log-bg:#0d0d0d;--log-border:#222;
+  --log-info:#9ecfff;--log-warn:#ffa726;--log-error:#e57373;--log-debug:#666;--log-ts:#444;
+  --ok:#4caf50;--err:#e53935;--warn:#ffa726;
+  --ap-banner-bg:#2a1500;
+  --drag-handle:#444;--drag-over-outline:#7eb8f7;
+  --grip-color:#333;--grip-hover:#7eb8f7;
+  --pass-toggle:#666;--pass-toggle-hover:#ccc;
+  --ws-status:#666;--ws-ok:#4caf50;--ws-err:#e53935;
+  --shadow:none;
+  --sensor-card-bg:#141414;
+  --sc-values-bg:#0d180d;--sc-values-border:#1e3a1e;
+  --sc-val-k:#555;--sc-val-v:#4caf50;
+  --summary-color:#555;
+  --cmd-divider:#2a2a2a;
+  --toast-bg:#1e2e10;--toast-border:#8bc34a;--toast-color:#8bc34a;
+}
+body{font-family:var(--font);font-size:13px;background:var(--bg);color:var(--text);display:flex;flex-direction:column;min-height:100vh}
+header{background:var(--header-bg);padding:10px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--header-border)}
+header h1{font-size:15px;color:var(--header-text);letter-spacing:1px}
+#refresh-btn{margin-left:auto}
+#refresh-btn,#theme-btn{background:rgba(255,255,255,.15);color:var(--header-text);border:1px solid rgba(255,255,255,.4);padding:3px 10px;cursor:pointer;border-radius:3px}
+#theme-btn{font-size:15px;padding:2px 7px;line-height:1.4}
+#refresh-btn:hover,#theme-btn:hover{background:rgba(255,255,255,.28)}
+body.dark #refresh-btn,body.dark #theme-btn{background:#23395d;color:#7eb8f7;border:1px solid #7eb8f7}
+body.dark #refresh-btn:hover,body.dark #theme-btn:hover{background:#2d4a7a}
+/* SVG logo */
+header svg .fil0{fill:rgba(255,255,255,.92)}
+header svg .fil1{fill:rgba(0,60,100,.55)}
+body.dark header svg .fil0{fill:#7eb8f7}
+body.dark header svg .fil1{fill:#1a1a2e}
+main{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:12px;flex:1}
+@media(max-width:640px){main{grid-template-columns:1fr}}
+section{background:var(--bg-card);border:none;border-radius:6px;padding:12px;box-shadow:var(--shadow)}
+section h2{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border-h2)}
+.full{grid-column:1/-1}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
+.stat{background:var(--bg-stat);border:1px solid var(--border);border-radius:4px;padding:6px 8px}
+.stat .label{color:var(--text-dim);font-size:10px;margin-bottom:2px}
+.stat .value{color:var(--text);font-size:13px}
+.ok{color:var(--ok)}
+.err{color:var(--err)}
+.warn{color:var(--warn)}
+.form-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.form-row label{color:var(--text-muted);width:90px;flex-shrink:0;font-size:11px}
+.form-row input[type=number],.form-row input[type=text],.form-row input[type=password]{background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:2px}
+.form-row input[type=number]{width:70px}
+.form-row input[type=text],.form-row input[type=password]{width:180px}
+.form-row input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
+textarea{width:100%;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:6px;border-radius:2px;min-height:120px;resize:vertical;font-family:monospace;font-size:12px}
+.btn{background:var(--btn-bg);color:var(--btn-text);border:1px solid var(--btn-border);padding:4px 12px;cursor:pointer;border-radius:3px;font-family:inherit;font-size:12px;margin-top:6px}
+.btn:hover{background:var(--btn-hover)}
+.btn.danger{color:var(--btn-danger-color);border-color:var(--btn-danger-border);background:var(--btn-danger-bg)}
+.btn.danger:hover{background:var(--btn-danger-hover)}
+.btn-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pass-wrap{position:relative;display:inline-block}
+.pass-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--pass-toggle);padding:2px;line-height:0}
+.pass-toggle:hover{color:var(--pass-toggle-hover)}
+.msg{margin-top:6px;font-size:11px;min-height:14px}
+.ap-banner{margin-bottom:10px;padding:8px;background:var(--ap-banner-bg);border:1px solid var(--warn);border-radius:3px;color:var(--warn)}
+.sublabel{font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em}
+.hint-text{font-size:12px;color:var(--text-dim)}
+.cmd-divider{margin-top:10px;padding-top:8px;border-top:1px solid var(--cmd-divider)}
+.feat-warn{font-size:11px;color:var(--err);margin:2px 0 6px 90px}
+/* Sensor cards */
+#sensor-cards,#sensor-cards-other{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
+.sensor-card{border:1px solid var(--border);border-radius:4px;padding:5px 7px;background:var(--sensor-card-bg)}
+.sensor-card .sc-head{display:flex;align-items:center;gap:6px}
+.sensor-card .sc-type{color:var(--accent);font-size:12px;flex:1}
+.sensor-card .sc-fields{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.sensor-card .sc-field{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted)}
+.sensor-card .sc-field input{width:56px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:2px 4px;border-radius:2px;font-size:11px}
+.sc-fixed-addr{color:var(--text-dim);font-size:10px}
+.sc-note{font-size:10px;color:var(--text-muted);font-style:italic;width:100%;margin-top:2px}
+.sc-values{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;padding-top:4px;border-top:1px solid var(--border)}
+.sc-val{background:var(--sc-values-bg);border:1px solid var(--sc-values-border);border-radius:2px;padding:1px 6px;font-size:11px}
+.sc-val-k{color:var(--sc-val-k)}
+.sc-val-v{color:var(--sc-val-v);margin-left:3px}
+#other-sensors-details{margin-top:8px}
+#other-sensors-details summary{cursor:pointer;font-size:10px;color:var(--summary-color);text-transform:uppercase;letter-spacing:1px;padding:3px 0;user-select:none}
+#other-sensors-details summary:hover{color:var(--text-muted)}
+#other-sensors-details[open] summary{color:var(--text-muted)}
+#sensor-cards-other{margin-top:6px}
+.i2c-addr{background:var(--sc-values-bg);border:1px solid var(--sc-values-border);border-radius:2px;padding:2px 7px;margin-right:4px;color:var(--sc-val-v)}
+/* Log */
+#log{height:240px;overflow-y:auto;background:var(--log-bg);border:1px solid var(--log-border);padding:6px;border-radius:2px;display:flex;flex-direction:column}
+#ota-file{font-size:12px;font-family:monospace;color:var(--text-muted);background:none;border:none;padding:0;flex:1;min-width:0}
+.log-entry{padding:1px 0;white-space:pre-wrap;word-break:break-all;line-height:1.5}
+.log-info{color:var(--log-info)}
+.log-warn{color:var(--log-warn)}
+.log-error{color:var(--log-error)}
+.log-debug{color:var(--log-debug)}
+.log-ts{color:var(--log-ts);font-size:11px;margin-right:6px}
+.ws-status{font-size:10px;color:var(--ws-status);margin-bottom:4px}
+.ws-ok{color:var(--ws-ok)}
+.ws-err{color:var(--ws-err)}
+/* Drag */
+.draggable-section{position:relative}
+.draggable-section>h2{cursor:grab;user-select:none}
+.draggable-section>h2::before{content:'⠿\00a0';color:var(--drag-handle)}
+.dragging{opacity:.4}
+.drag-over{outline:1px solid var(--drag-over-outline)}
+.sec-grip{position:absolute;right:4px;top:0;bottom:0;display:flex;align-items:center;cursor:ew-resize;color:var(--grip-color);user-select:none;font-size:13px}
+.sec-grip:hover{color:var(--grip-hover)}
+progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-top:6px}
+/* Toast */
+#toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--toast-bg);border:1px solid var(--toast-border);color:var(--toast-color);padding:7px 18px;border-radius:4px;font-size:12px;z-index:999;pointer-events:none;opacity:0;transition:opacity .25s}
+#toast.show{opacity:1}
+/* OTA confirm modal */
+#ota-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100}
+#ota-modal-box{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:20px 24px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.22)}
+#ota-modal-box h3{font-size:14px;color:var(--accent);margin-bottom:12px}
+#ota-modal-body{font-size:13px;color:var(--text);line-height:1.6}
+.ota-ver{font-family:monospace;font-size:12px;color:var(--text-muted);margin-top:6px}
+.ota-warn{margin-top:10px;font-size:12px;color:var(--warn)}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- OTA confirm modal -->
+<div id="ota-modal" style="display:none">
+  <div id="ota-modal-box">
+    <h3>Firmware Update Available</h3>
+    <div id="ota-modal-body"></div>
+    <div class="btn-row" id="ota-modal-btns"></div>
+  </div>
+</div>
+
+<header>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="4100 5000 10500 12600" height="47" style="flex-shrink:0"><style>.fil0{fill:#7eb8f7}.fil1{fill:#1a1a2e}</style><g><path class="fil0" d="M4996.26 8916.16c147.58,-30.97 607.63,-92.99 687.54,-169.82 492.51,-473.48 576,-716.5 1487.39,-1184.03 1551.97,-796.14 3396.47,-663.79 4857.59,302.18 690.06,456.22 1295.07,1156.5 1640.46,1904.34 79.7,172.57 179.95,499.69 261.89,640.63l400.8 -163.74c-58.59,-417.23 -541.44,-1238.48 -802.62,-1580.31 -1662.08,-2175.33 -4760.53,-2767.55 -7106.69,-1190.38l-410.35 303.99c-56.6,43.32 -71.04,65.35 -124.91,112.55 -293.04,256.76 -696.26,682.96 -891.1,1024.59z"/><path class="fil0" d="M4143.71 11171.54l-35.9 550.95c245.81,-87.52 482.21,-334.48 1136.42,-504.76 1421.16,-369.91 2755.43,261.89 3996.55,810.66 1630.45,720.91 3213.85,1348.49 4992.89,665.13l272.86 -130c41.53,-31.3 67.81,-448.54 77.09,-526.25 -421.4,138.17 -524.12,303.15 -1236.56,431 -1396.18,250.55 -2790.05,-349.08 -3996.19,-894.19 -1222.15,-552.35 -2588.22,-1129.02 -3997.03,-852.47 -534.53,104.92 -783.84,268.9 -1210.13,449.93z"/><path class="fil0" d="M4373.13 10350.09c375.36,-133.94 478.4,-307.24 1176.58,-440.1 2538.18,-483.01 4832.06,2155.86 7719,1791.7 353.98,-44.65 1013.32,-187.69 1256.3,-369.04l-67.46 -449.42c-140.49,29.48 -413.85,166.66 -594.07,222.6 -731.56,227.05 -1445,209.53 -2186.35,44.57 -1740.34,-387.23 -3173.29,-1490.58 -4946.31,-1716.98 -524.38,-66.96 -1026.33,-42.55 -1521.03,83.68 -158.79,40.52 -507.83,127.69 -592.45,226.69 -53.95,63.11 -221.18,501.27 -244.21,606.3z"/><path class="fil0" d="M4275.06 12839.75c173.69,-63.28 367.89,-187.5 580.56,-264.69 1641.23,-595.71 3060.08,164.69 4539.9,806.19 1249.31,541.58 2579.03,1057.51 4007.49,783.78 137.36,-26.32 552.59,-108.6 629.47,-191.19 51.36,-55.18 224.22,-473.94 241.74,-569.24 -443.7,156.5 -707.66,294.62 -1248.93,353.18 -3096.37,334.97 -5534.92,-3062.86 -8845.11,-1381.93 -0.96,139.37 29.34,358.84 94.88,463.9z"/><path class="fil0" d="M10451.41 16306.19c-37.3,-271.97 353.7,-325.6 396.6,-68.75 45.53,272.66 -363.62,309.27 -396.6,68.75zm-1510.88 -2172.21c233.26,-104.9 372.58,283.66 139.94,368.92 -254.39,93.23 -411.36,-246.85 -139.94,-368.92zm-274.34 -182.67c-207.53,180.98 -330.03,899.71 505.72,845.8 58.71,83.11 380.23,405.42 470.22,480.56 141.17,117.87 655.34,62.38 876.3,62.38l1859.73 5.88c-885.66,804.38 -430.92,716.52 -1256.63,718.65 -73.47,-122.58 -91.29,-173.36 -224.93,-243.2 -708.47,-370.26 -1096.18,820.76 -340.46,948.24 362.03,61.06 475.62,-164.08 572.31,-296.24 468.88,0.67 644.98,63.38 831.43,-127.85l940.53 -937.76c64.01,-63.38 198.13,-153.48 186.7,-289.99 -11.98,-143.18 -123.22,-179.21 -265.46,-181.26 -870.05,-12.55 -2029.53,32.54 -2834.51,3.32 -236.64,-8.59 -281.39,-231.03 -526.9,-404.08 141.02,-814 -570.85,-779.11 -794.05,-584.45z"/><path class="fil0" d="M7611.38 16352.69c216.34,-116.33 389.4,226.34 181.31,350.62 -217.23,129.73 -462.66,-199.33 -181.31,-350.62zm-1271.08 -2091.59c256.75,-100.72 365.14,298.85 146.72,371.63 -280.56,93.48 -401.95,-271.51 -146.72,-371.63zm879.41 2033.32c-64.28,361.82 -23.45,574.11 255.9,700.69 622.96,282.26 1023.83,-643.51 442.3,-919.7 -144.55,-68.65 -318.72,-20.08 -395.75,-55.6 -23.62,-10.89 -217.17,-211 -253.32,-247.09 -329.39,-328.83 -228.62,-190 -774.15,-220.89 -180.19,-10.2 -366.1,-270.6 -555.73,-459.84 -625.4,-624.13 -616.01,-494.17 -613.95,-902.18 0.81,-161.87 0.69,-324.27 -0.63,-486.73l877.24 8.14c-4.1,260.88 53.09,225.61 -110.58,363.05 -84.15,70.67 -155.15,155.41 -173.59,303.78 -79.04,636.07 821.4,761.83 966.67,197.44 105.67,-410.52 -232.16,-491.72 -272.3,-623.8 2.1,-396.32 103.34,-657.27 -324.92,-655.45 -317.9,1.35 -635.9,2.08 -953.83,0.75 -483.98,-2.01 -415.65,60.35 -415.46,522.42 0.45,1086.21 -156.18,684.66 1019.46,1856.49 244.46,243.66 183.21,284.81 666.09,280.93 479.79,-3.86 230.23,55.04 616.55,337.59z"/><path class="fil0" d="M6685.35 8763.62c95.68,63.84 329.33,68.82 465.25,93.67 190.55,34.84 257.11,-67.75 400.06,-148.52 1340.97,-757.74 3049.02,-589.94 4130.84,376.49 348.31,311.17 925.26,958.46 1048.11,1544.04 437.11,1.02 500,8.32 443.34,-146.82 -60.81,-166.47 -131.31,-336.97 -206.96,-486.77 -1193.76,-2363.73 -4298.51,-2936.24 -6280.64,-1232.09z"/><path class="fil0" d="M9189.49 16611.15c271.47,-102.61 369.05,295.71 150.6,371.13 -277.52,95.81 -386.44,-281.98 -150.6,-371.13zm-1692.91 -3120.34c242.46,-128.43 388.81,238.19 185.65,350.5 -248.61,137.44 -418.77,-227.03 -185.65,-350.5zm294.72 641.83c191.44,-70.76 366.32,-290.59 288.02,-597.31 -52.7,-206.45 -248.63,-373.45 -496.84,-372.35 -580.07,2.57 -671.37,796.51 -201.35,965.02 5.99,533.96 1.84,407.88 285.62,691.26l979.86 977.81c113.53,117.76 447.51,438.43 408.9,535.57 -20.82,52.4 -354.51,176.36 -275.18,574.57 102.38,513.96 886.08,506.93 967.8,-22.89 59.77,-387.6 -258.04,-496.92 -280.46,-551.68 -5.52,-244.43 37.8,-253.52 -118.48,-391.68 -79.05,-69.89 -138.7,-153.59 -226.84,-249.27l-966.09 -965.11c-373.65,-373.11 -368.86,-286.36 -364.96,-593.94z"/><path class="fil0" d="M8303.96 9163.34c98.28,79.92 292.9,121.7 424.7,176.07 401.7,165.7 758.14,-138.21 1608.49,243.5 321.22,144.19 344.13,189.46 570.44,355.05 183.83,134.51 396.56,440.64 476.19,477.68 88.29,41.05 401.61,107.96 516.41,126.86 -107.34,-294.37 -396.73,-618.34 -575.22,-783.96 -523.38,-485.65 -1131.29,-777.21 -1890.23,-797.59 -305.19,-8.2 -903.11,60.41 -1130.78,202.39z"/><path class="fil1" d="M6340.3 14261.1c-255.23,100.12 -133.84,465.11 146.72,371.63 218.42,-72.78 110.03,-472.35 -146.72,-371.63z"/><path class="fil1" d="M9189.49 16611.15c-235.84,89.15 -126.92,466.94 150.6,371.13 218.45,-75.42 120.87,-473.74 -150.6,-371.13z"/><path class="fil1" d="M10451.41 16306.19c32.98,240.52 442.13,203.91 396.6,-68.75 -42.9,-256.85 -433.9,-203.22 -396.6,68.75z"/><path class="fil1" d="M8940.53 14133.98c-271.42,122.07 -114.45,462.15 139.94,368.92 232.64,-85.26 93.32,-473.82 -139.94,-368.92z"/><path class="fil1" d="M7611.38 16352.69c-281.35,151.29 -35.92,480.35 181.31,350.62 208.09,-124.28 35.03,-466.95 -181.31,-350.62z"/><path class="fil1" d="M7496.58 13490.81c-233.12,123.47 -62.96,487.94 185.65,350.5 203.16,-112.31 56.81,-478.93 -185.65,-350.5z"/></g></svg>
+  <h1>AirMQ SensorNode</h1>
+  <button id="refresh-btn" onclick="loadState()">Refresh</button>
+  <button id="theme-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+</header>
+<main>
+
+  <!-- Status -->
+  <section class="full">
+    <h2>Status</h2>
+    <div class="stat-grid">
+      <div class="stat"><div class="label">Chip ID</div><div class="value" id="s-chip">—</div></div>
+      <div class="stat"><div class="label">MCU</div><div class="value" id="s-mcu">—</div></div>
+      <div class="stat"><div class="label">Flash</div><div class="value" id="s-flash">—</div></div>
+      <div class="stat"><div class="label">IP</div><div class="value" id="s-ip">—</div></div>
+      <div class="stat"><div class="label">WiFi</div><div class="value" id="s-wifi">—</div></div>
+      <div class="stat"><div class="label">MQTT</div><div class="value" id="s-mqtt">—</div></div>
+      <div class="stat"><div class="label">RSSI</div><div class="value" id="s-rssi">—</div></div>
+      <div class="stat"><div class="label">Uptime</div><div class="value" id="s-uptime">—</div></div>
+      <div class="stat"><div class="label">Active Sensors</div><div class="value" id="s-sensors">—</div></div>
+      <div class="stat"><div class="label">Readings</div><div class="value" id="s-readings">—</div></div>
+      <div class="stat"><div class="label">Free Heap</div><div class="value" id="s-heap">—</div></div>
+      <div class="stat"><div class="label">Sample Num</div><div class="value" id="s-sample">—</div></div>
+      <div class="stat"><div class="label">Tele Interval</div><div class="value" id="s-tele">—</div></div>
+      <div class="stat"><div class="label">Build</div><div class="value" id="s-build">—</div></div>
+      <div class="stat"><div class="label">Time</div><div class="value" id="s-time">—</div></div>
+      <div class="stat"><div class="label">NTP</div><div class="value" id="s-ntp">—</div></div>
+    </div>
+  </section>
+
+  <!-- WiFi Setup -->
+  <section id="wifi-section" class="draggable-section" draggable="true" style="display:none">
+    <h2>WiFi Setup</h2>
+    <div id="wifi-ap-banner" class="ap-banner" style="display:none">
+      &#9888; Running in AP mode &mdash; configure WiFi below to enable MQTT uplink
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start">
+      <div>
+        <div class="sublabel" style="margin-top:2px">Primary</div>
+        <div class="form-row"><label>SSID</label><input type="text" id="wifi-ssid" placeholder="Network name"><button class="btn" onclick="scanWifi()" style="margin-top:0;margin-left:4px">Scan</button></div>
+        <div class="form-row"><label>Password</label><div class="pass-wrap"><input type="password" id="wifi-pass" style="padding-right:24px" placeholder="leave empty for open"><input type="text" id="wifi-pass-vis" style="display:none;padding-right:24px"><button class="pass-toggle" onclick="togglePass('wifi-pass',this)" title="Show/hide"><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><circle cx='12' cy='12' r='3'/></svg></button></div></div>
+        <div class="sublabel" style="margin-top:4px">Backup</div>
+        <div class="form-row"><label>SSID</label><input type="text" id="wifi-ssid2" placeholder="Backup network"></div>
+        <div class="form-row"><label>Password</label><div class="pass-wrap"><input type="password" id="wifi-pass2" style="padding-right:24px" placeholder="leave empty for open"><input type="text" id="wifi-pass2-vis" style="display:none;padding-right:24px"><button class="pass-toggle" onclick="togglePass('wifi-pass2',this)" title="Show/hide"><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><circle cx='12' cy='12' r='3'/></svg></button></div></div>
+        <button class="btn" onclick="saveWifi()">Save</button>
+        <div class="msg" id="wifi-msg"></div>
+      </div>
+      <div id="wifi-scan-list" style="display:none;flex:1;min-width:200px">
+        <div class="hint-text" style="margin-bottom:4px">Click to select:</div>
+        <div id="wifi-nets" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MQTT Config -->
+  <section id="mqtt-section" class="draggable-section" draggable="true">
+    <h2>MQTT Config</h2>
+    <div class="form-row"><label>Broker</label><input type="text" id="mqtt-broker" placeholder="hostname or IP" style="width:200px"></div>
+    <div class="form-row"><label>Port</label><input type="number" id="mqtt-port" min="1" max="65535"></div>
+    <div class="form-row"><label>Topic Prefix</label><input type="text" id="mqtt-prefix" placeholder="Sensors/" style="width:140px"></div>
+    <div class="form-row"><label>TLS / MQTTS</label><input type="checkbox" id="mqtt-tls"></div>
+    <button class="btn" onclick="saveMqttConfig()">Save</button>
+    <div class="msg" id="mqtt-msg"></div>
+  </section>
+
+  <!-- Hardware Setup -->
+  <section id="hw-section" class="draggable-section" draggable="true">
+    <h2>Hardware Setup</h2>
+    <div class="form-row"><label>I2C SDA</label><input type="number" id="hw-sda" min="-1" max="48"></div>
+    <div class="form-row"><label>I2C SCL</label><input type="number" id="hw-scl" min="-1" max="48"></div>
+    <div class="form-row"><label>UART RX</label><input type="number" id="hw-urx" min="-1" max="48"></div>
+    <div class="form-row"><label>UART TX</label><input type="number" id="hw-utx" min="-1" max="48"></div>
+    <div class="form-row"><label>1-Wire pin</label><input type="number" id="hw-ow" min="-1" max="48"></div>
+    <div class="form-row"><label>LED pin</label><input type="number" id="hw-led" min="-1" max="48" title="-1 = disabled"></div>
+    <button class="btn" onclick="saveHwConfig()">Save</button>
+    <div class="msg" id="hw-msg"></div>
+  </section>
+
+  <!-- Sensors -->
+  <section id="sensorsetup-section" class="draggable-section" draggable="true">
+    <h2>Sensors</h2>
+    <div id="sensor-cards"></div>
+    <details id="other-sensors-details">
+      <summary>Other sensors</summary>
+      <div id="sensor-cards-other"></div>
+    </details>
+    <div class="btn-row">
+      <button class="btn" onclick="saveSensorSetup()">Save</button>
+      <a class="btn" href="/api/config/export">Download Config</a>
+    </div>
+    <div class="msg" id="sensorsetup-msg"></div>
+  </section>
+
+  <!-- Commands -->
+  <section id="cmd-section" class="draggable-section" draggable="true">
+    <h2>Commands</h2>
+    <div class="btn-row">
+      <button class="btn danger" onclick="sendCmd({cmd:'reboot'})">Reboot</button>
+      <button class="btn" onclick="sendCmd({cmd:'telemetry'})">Send Telemetry</button>
+      <button class="btn" id="debug-btn" onclick="toggleDebug()">Debug Log: OFF</button>
+    </div>
+    <div class="cmd-divider">
+      <div class="sublabel" style="margin-bottom:6px">Factory Reset</div>
+      <div class="form-row"><label style="color:var(--text-muted);width:auto;margin-right:8px"><input type="checkbox" id="reset-keep-wifi" style="margin-right:4px">Keep WiFi</label><label style="color:var(--text-muted);width:auto"><input type="checkbox" id="reset-keep-mqtt" style="margin-right:4px">Keep MQTT</label></div>
+      <button class="btn danger" onclick="doFactoryReset()" style="margin-top:6px">Factory Reset</button>
+    </div>
+    <div class="msg" id="cmd-msg"></div>
+  </section>
+
+  <!-- Firmware Update -->
+  <section id="ota-section" class="full draggable-section" draggable="true">
+    <h2>Firmware Update</h2>
+    <div style="display:flex;align-items:center;gap:8px">
+      <input type="file" id="ota-file" accept=".bin">
+      <button class="btn" onclick="doOta()" style="margin-top:0;flex-shrink:0">Flash &amp; Reboot</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <span class="hint-text" style="flex:1">Download from OTA server — watch log for progress</span>
+      <button class="btn" onclick="checkOtaVersion()" style="margin-top:0;flex-shrink:0">Check OTA Server</button>
+    </div>
+    <progress id="ota-progress" value="0" max="100"></progress>
+    <div class="msg" id="ota-msg"></div>
+  </section>
+
+  <!-- Utils -->
+  <section id="utils-section" class="draggable-section" draggable="true">
+    <h2>Utils</h2>
+    <div class="sublabel" style="margin-bottom:8px">I2C Scanner</div>
+    <button class="btn" onclick="runI2cScan()">Scan I2C Bus</button>
+    <div id="i2c-result" style="margin-top:8px;font-size:12px;min-height:20px"></div>
+  </section>
+
+  <!-- Features -->
+  <section id="features-section" class="draggable-section" draggable="true">
+    <h2>Features</h2>
+    <div class="form-row"><label>WebSocket Log (port 81)</label><input type="checkbox" id="feat-wslog" checked></div>
+    <div class="form-row"><label>Web UI (port 80)</label><input type="checkbox" id="feat-web" checked></div>
+    <div id="feat-web-warn" class="feat-warn" style="display:none">Disabling requires MQTT cmd to re-enable</div>
+    <button class="btn" onclick="saveFeatures()">Apply</button>
+    <div class="msg" id="feat-msg"></div>
+  </section>
+
+  <!-- Log Stream -->
+  <section id="log-section" class="full">
+    <h2>Log Stream</h2>
+    <div class="ws-status"><span id="ws-dot">&#9679;</span> <span id="ws-label">disconnected</span></div>
+    <div id="log"></div>
+  </section>
+
+</main>
+<script>
+var MAX_LOG = 200;
+var bootEpoch = null;
+
+// ── Theme ──────────────────────────────────────────────────────────────────────
+
+(function(){
+  if (localStorage.getItem('theme') === 'dark') {
+    document.body.classList.add('dark');
+    document.getElementById('theme-btn').textContent = '☀';
+  }
+})();
+
+function toggleTheme() {
+  var dark = document.body.classList.toggle('dark');
+  localStorage.setItem('theme', dark ? 'dark' : 'light');
+  document.getElementById('theme-btn').textContent = dark ? '☀' : '🌙';
+}
+
+// ── State ──────────────────────────────────────────────────────────────────────
+function loadState() {
+  fetch('/api/state')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      set('s-chip',   d.chipId);
+      set('s-mcu',    d.mcu || '—');
+      set('s-flash',  d.flashKB ? (d.flashKB >= 1024 ? (d.flashKB/1024) + ' MB' : d.flashKB + ' KB') : '—');
+      set('s-ip',     d.ipAddress || '—');
+      set('s-wifi',   d.apMode ? '<span class="warn">&#9679; AP mode</span>'
+                               : (d.wifiConnected ? '<span class="ok">&#9679; connected</span>'
+                                                  : '<span class="err">&#9679; offline</span>'));
+      set('s-mqtt',   d.mqttConnected ? '<span class="ok">&#9679; connected</span>' : '<span class="err">&#9679; offline</span>');
+      set('s-rssi',   d.apMode ? '—' : (d.wifiRSSI + ' dBm'));
+      set('s-uptime', d.uptime + ' min');
+      set('s-sensors', d.sensorsActive);
+      set('s-readings', d.readingCount);
+      set('s-heap',   Math.round(d.freeHeap/1024) + ' KB');
+      set('s-sample', d.sampleNum);
+      set('s-tele',   d.teleInterval + ' min');
+      set('s-build',  d.build);
+      if (d.ntpSynced && d.epochTime) {
+        var dt = new Date(d.epochTime*1000);
+        set('s-time', pad(dt.getHours())+':'+pad(dt.getMinutes())+':'+pad(dt.getSeconds()));
+        set('s-ntp',  '<span class="ok">synced</span>');
+        if (d.millisNow !== undefined)
+          bootEpoch = d.epochTime * 1000 - d.millisNow;
+      } else {
+        set('s-time', '—');
+        set('s-ntp',  '<span class="err">not synced</span>');
+        bootEpoch = null;
+      }
+      debugOn = !!d.debugLog;
+      var btn = document.getElementById('debug-btn');
+      btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');
+      btn.style.color = debugOn ? '#4caf50' : '';
+      btn.style.borderColor = debugOn ? '#4caf50' : '';
+    })
+    .catch(function(){set('s-wifi','<span class="err">fetch failed</span>')});
+  loadSensorValues();
+}
+
+function loadSensorValues() {
+  fetch('/api/sensors/values')
+    .then(function(r){return r.json()})
+    .then(function(v){
+      SENSOR_TYPES.forEach(function(st){
+        if (st.hidden) return;
+        var cb = document.querySelector('input[type=checkbox][data-type="'+st.type+'"]');
+        if (!cb || !cb.checked) return;
+        var card = cb.closest('.sensor-card');
+        if (!card) return;
+        var existing = card.querySelector('.sc-values');
+        var vals = v[st.type];
+        if (!vals) { if (existing) existing.remove(); return; }
+        var items = Object.keys(vals).map(function(k){
+          var u = UNITS[k] !== undefined ? UNITS[k] : '';
+          var n = (typeof vals[k] === 'number') ? (Math.round(vals[k]*10)/10) : vals[k];
+          return '<span class="sc-val"><span class="sc-val-k">'+k+'</span>'
+               + '<span class="sc-val-v">'+n+(u?'&thinsp;'+u:'')+'</span></span>';
+        }).join('');
+        if (existing) existing.innerHTML = items;
+        else if (items) card.insertAdjacentHTML('beforeend','<div class="sc-values">'+items+'</div>');
+      });
+    })
+    .catch(function(){});
+}
+
+function set(id, html) {
+  var el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+// ── WiFi ──────────────────────────────────────────────────────────────────────
+function loadWifi() {
+  fetch('/api/wifi').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('wifi-section').style.display = 'block';
+    document.getElementById('wifi-ap-banner').style.display = d.apMode ? 'block' : 'none';
+    if (d.ssid)  document.getElementById('wifi-ssid').value  = d.ssid;
+    if (d.ssid2) document.getElementById('wifi-ssid2').value = d.ssid2;
+    document.getElementById('wifi-pass').placeholder  = d.hasPass  ? 'password saved (leave blank to keep)' : 'leave empty for open';
+    document.getElementById('wifi-pass2').placeholder = d.hasPass2 ? 'password saved (leave blank to keep)' : 'leave empty for open';
+  }).catch(function(){});
+}
+
+function scanWifi() {
+  showMsg('wifi-msg','Scanning...',true);
+  document.getElementById('wifi-scan-list').style.display = 'none';
+  fetch('/api/wifi/scan').then(function(r){return r.json()}).then(function(nets){
+    var c = document.getElementById('wifi-nets');
+    c.innerHTML = '';
+    nets.sort(function(a,b){return b.rssi-a.rssi}).forEach(function(n){
+      var b = document.createElement('button');
+      b.className = 'btn'; b.style.margin = '0';
+      b.textContent = n.ssid+' ('+n.rssi+' dBm'+(n.secure?' \uD83D\uDD12':'')+')';
+      b.onclick = function(){ document.getElementById('wifi-ssid').value=n.ssid; document.getElementById('wifi-pass').focus(); };
+      c.appendChild(b);
+    });
+    document.getElementById('wifi-scan-list').style.display = nets.length ? 'block' : 'none';
+    showMsg('wifi-msg', nets.length+' networks found', true);
+  }).catch(function(){showMsg('wifi-msg','Scan failed',false)});
+}
+
+var SVG_EYE     = "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><circle cx='12' cy='12' r='3'/></svg>";
+var SVG_EYE_OFF = "<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><line x1='3' y1='3' x2='21' y2='21'/></svg>";
+
+function togglePass(id, btn) {
+  var passEl = document.getElementById(id);
+  var visEl  = document.getElementById(id + '-vis');
+  var hiding = passEl.style.display !== 'none';
+  if (hiding) {
+    visEl.value = passEl.value;
+    visEl.placeholder = passEl.placeholder;
+    passEl.style.display = 'none';
+    visEl.style.display = '';
+    btn.innerHTML = SVG_EYE_OFF;
+  } else {
+    passEl.value = visEl.value;
+    visEl.style.display = 'none';
+    passEl.style.display = '';
+    btn.innerHTML = SVG_EYE;
+  }
+}
+
+function getPassVal(id) {
+  var passEl = document.getElementById(id);
+  return passEl.style.display === 'none'
+    ? document.getElementById(id + '-vis').value
+    : passEl.value;
+}
+
+function saveWifi() {
+  var ssid = document.getElementById('wifi-ssid').value.trim();
+  if (!ssid) { showMsg('wifi-msg','SSID required',false); return; }
+  fetch('/api/wifi', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ssid:ssid, pass:getPassVal('wifi-pass'),
+      ssid2:document.getElementById('wifi-ssid2').value.trim(),
+      pass2:getPassVal('wifi-pass2')})
+  }).then(function(r){return r.json()}).then(function(d){
+    showMsg('wifi-msg',d.ok?(d.msg||'Saved'):('Error: '+d.error),d.ok);
+    if(d.ok) showToast('Saved — reboot to apply');
+  }).catch(function(){showMsg('wifi-msg','Request failed',false)});
+}
+
+// ── MQTT Config ────────────────────────────────────────────────────────────────
+function loadMqttConfig() {
+  fetch('/api/mqtt/config').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('mqtt-broker').value = d.broker || '';
+    document.getElementById('mqtt-port').value   = d.port   || 8883;
+    document.getElementById('mqtt-prefix').value = d.prefix || 'Sensors/';
+    document.getElementById('mqtt-tls').checked  = !!d.tls;
+  }).catch(function(){});
+}
+
+function saveMqttConfig() {
+  var body = {
+    broker: document.getElementById('mqtt-broker').value.trim(),
+    port:   parseInt(document.getElementById('mqtt-port').value),
+    prefix: document.getElementById('mqtt-prefix').value,
+    tls:    document.getElementById('mqtt-tls').checked
+  };
+  if (!body.broker) { showMsg('mqtt-msg','Broker required',false); return; }
+  fetch('/api/mqtt/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      showMsg('mqtt-msg', d.ok ? (d.msg||'Saved') : ('Error: '+d.error), d.ok);
+      if(d.ok) showToast('Saved — reboot to apply');
+    }).catch(function(){showMsg('mqtt-msg','Request failed',false)});
+}
+
+// ── Hardware Setup ─────────────────────────────────────────────────────────────
+function loadHwConfig() {
+  fetch('/api/hw/config').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('hw-sda').value = d.i2c_sda !== undefined ? d.i2c_sda : 4;
+    document.getElementById('hw-scl').value = d.i2c_scl !== undefined ? d.i2c_scl : 5;
+    document.getElementById('hw-urx').value = d.uart_rx !== undefined ? d.uart_rx : 3;
+    document.getElementById('hw-utx').value = d.uart_tx !== undefined ? d.uart_tx : 1;
+    document.getElementById('hw-ow').value  = d.onewire !== undefined ? d.onewire : 2;
+    document.getElementById('hw-led').value = d.led_pin !== undefined ? d.led_pin : -1;
+  }).catch(function(){});
+}
+
+function saveHwConfig() {
+  var body = {
+    i2c_sda: parseInt(document.getElementById('hw-sda').value),
+    i2c_scl: parseInt(document.getElementById('hw-scl').value),
+    uart_rx: parseInt(document.getElementById('hw-urx').value),
+    uart_tx: parseInt(document.getElementById('hw-utx').value),
+    onewire: parseInt(document.getElementById('hw-ow').value),
+    led_pin: parseInt(document.getElementById('hw-led').value)
+  };
+  fetch('/api/hw/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      showMsg('hw-msg', d.ok ? (d.msg||'Saved') : ('Error: '+d.error), d.ok);
+      if(d.ok) showToast('Saved — reboot to apply');
+    }).catch(function(){showMsg('hw-msg','Request failed',false)});
+}
+
+// ── Sensor Setup ───────────────────────────────────────────────────────────────
+var SENSOR_TYPES = [
+  {type:'bme280',  label:'BME280',       fields:[{key:'addr',label:'I2C addr',def:0x76}]},
+  {type:'bmp280',  label:'BMP280',       hidden:true, fields:[{key:'addr',label:'I2C addr',def:0x76}]},
+  {type:'bmp580',  label:'BMP580',       fields:[{key:'addr',label:'I2C addr',def:0x46}]},
+  {type:'sht30',   label:'SHT3x',        fields:[{key:'addr',label:'I2C addr',def:0x44}]},
+  {type:'sht4x',   label:'SHT4x',        fields:[{key:'addr',label:'I2C addr',def:0x44}]},
+  {type:'htu21d',  label:'HTU21D',       fixedAddr:0x40, fields:[]},
+  {type:'scd4x',   label:'SCD4x',        fixedAddr:0x62, fields:[]},
+  {type:'sgp4x',   label:'SGP4x',        fixedAddr:0x59, fields:[]},
+  {type:'xdb401',  label:'XDB401',       fields:[{key:'addr',label:'I2C addr',def:0x7F},{key:'fullscale_pa',label:'Full scale (MPa)',def:500000,fmt:'num',div:1e6}]},
+  {type:'ds18b20', label:'DS18B20',      fields:[]},
+  {type:'pms7003', label:'PMS7003',      fields:[]},
+  {type:'geiger',  label:'Geiger Counter', fields:[{key:'pin', label:'GPIO pin', def:14, fmt:'num', note:'Avoid pins used by UART/I2C/OneWire'}]},
+];
+
+var sensorSetupData = [];
+var UNITS = {
+  Temp:'°C', Hum:'%', Press:'hPa',
+  CO2:'ppm', VOC:'idx', NOx:'idx',
+  PMS1:'µg/m³', PMS25:'µg/m³', PMS10:'µg/m³',
+  CPM:'cpm'
+};
+
+function buildSensorCard(st, entry, values) {
+  var card = document.createElement('div');
+  card.className = 'sensor-card';
+  var headHtml = '<div class="sc-head">'
+    +'<input type="checkbox" data-type="'+st.type+'" '+(entry.enabled?'checked':'')+'>'
+    +'<span class="sc-type">'+st.label+'</span></div>';
+  var fieldsHtml = '<div class="sc-fields">';
+  if (st.fixedAddr !== undefined) {
+    fieldsHtml += '<span class="sc-fixed-addr">0x'+st.fixedAddr.toString(16)+'</span>';
+  }
+  st.fields.forEach(function(f){
+    var val = entry[f.key] !== undefined ? entry[f.key] : f.def;
+    if (f.fmt === 'num') {
+      var dispVal = f.div ? val / f.div : val;
+      fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
+        +'<input type="number" data-type="'+st.type+'" data-key="'+f.key+'" data-fmt="num"'+(f.div?' data-div="'+f.div+'"':'')+' value="'+dispVal+'" step="any" style="width:64px"></div>';
+      if (f.note) fieldsHtml += '<div class="sc-note">⚠ '+f.note+'</div>';
+    } else {
+      var hexVal = '0x' + val.toString(16);
+      fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
+        +'<input type="text" data-type="'+st.type+'" data-key="'+f.key+'" value="'+hexVal+'" style="width:52px" oninput="updateHexSpan(this)">'
+        +'<span class="sc-fixed-addr">('+val+')</span></div>';
+    }
+  });
+  fieldsHtml += '</div>';
+  var valHtml = '';
+  if (entry.enabled && values && values[st.type]) {
+    var v = values[st.type];
+    var items = Object.keys(v).map(function(k){
+      var u = UNITS[k] !== undefined ? UNITS[k] : '';
+      var n = (typeof v[k] === 'number') ? (Math.round(v[k]*10)/10) : v[k];
+      return '<span class="sc-val"><span class="sc-val-k">'+k+'</span>'
+           + '<span class="sc-val-v">'+n+(u?'&thinsp;'+u:'')+'</span></span>';
+    }).join('');
+    if (items) valHtml = '<div class="sc-values">'+items+'</div>';
+  }
+  card.innerHTML = headHtml + fieldsHtml + valHtml;
+  return card;
+}
+
+function renderSensorCards(data, values) {
+  var active  = document.getElementById('sensor-cards');
+  var other   = document.getElementById('sensor-cards-other');
+  var details = document.getElementById('other-sensors-details');
+  active.innerHTML = '';
+  other.innerHTML  = '';
+  var hasOther = false;
+  SENSOR_TYPES.forEach(function(st) {
+    if (st.hidden) return;
+    var entry = data.find(function(e){return e.type===st.type}) || {type:st.type,enabled:false};
+    var card = buildSensorCard(st, entry, values || {});
+    if (entry.enabled) { active.appendChild(card); }
+    else { other.appendChild(card); hasOther = true; }
+  });
+  details.style.display = hasOther ? '' : 'none';
+}
+
+function loadSensorSetup() {
+  var setupP  = fetch('/api/sensors/setup').then(function(r){return r.json()});
+  var valuesP = fetch('/api/sensors/values').then(function(r){return r.json()}).catch(function(){return {};});
+  setupP.then(function(d){
+    sensorSetupData = Array.isArray(d) ? d : [];
+    valuesP.then(function(v){ renderSensorCards(sensorSetupData, v); });
+  }).catch(function(){renderSensorCards([],{})});
+}
+
+function saveSensorSetup() {
+  var result = [];
+  SENSOR_TYPES.forEach(function(st) {
+    if (st.hidden) {
+      var existing = sensorSetupData.find(function(e){return e.type===st.type});
+      if (existing) result.push(existing);
+      return;
+    }
+    var cb  = document.querySelector('input[type=checkbox][data-type="'+st.type+'"]');
+    var obj = {type: st.type, enabled: cb ? cb.checked : false};
+    st.fields.forEach(function(f){
+      var inp = document.querySelector('input[data-type="'+st.type+'"][data-key="'+f.key+'"]');
+      if (inp) obj[f.key] = f.fmt === 'num' ? parseFloat(inp.value) * (f.div || 1) : parseInt(inp.value);
+    });
+    result.push(obj);
+  });
+  var addrMap = {}, conflicts = [];
+  result.forEach(function(obj) {
+    if (!obj.enabled) return;
+    var st = SENSOR_TYPES.find(function(s){return s.type===obj.type});
+    if (!st) return;
+    var addr = obj.addr !== undefined ? obj.addr : st.fixedAddr;
+    if (addr === undefined) return;
+    if (addrMap[addr]) { conflicts.push('0x'+addr.toString(16)+': '+addrMap[addr]+' & '+st.label); }
+    else { addrMap[addr] = st.label; }
+  });
+  if (conflicts.length) { showMsg('sensorsetup-msg', 'Address conflict: '+conflicts.join('; '), false); return; }
+  fetch('/api/sensors/setup', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(result)})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      showMsg('sensorsetup-msg', d.ok ? 'Saved.' : ('Error: '+d.error), d.ok);
+      if (d.ok) { sensorSetupData = result; renderSensorCards(result, {}); }
+    })
+    .catch(function(){showMsg('sensorsetup-msg','Request failed',false)});
+}
+
+// ── Commands ───────────────────────────────────────────────────────────────────
+function sendCmd(body) { postJson('/api/cmd', body, 'cmd-msg'); }
+
+function doFactoryReset() {
+  var keepWifi = document.getElementById('reset-keep-wifi').checked;
+  var keepMqtt = document.getElementById('reset-keep-mqtt').checked;
+  var what = ['hw config', 'sensors'];
+  if (!keepWifi) what.push('WiFi');
+  if (!keepMqtt) what.push('MQTT');
+  if (!confirm('Reset ' + what.join(', ') + ' and reboot?')) return;
+  fetch('/api/config/reset', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({preserve_wifi: keepWifi, preserve_mqtt: keepMqtt})})
+    .then(function(r){return r.json()})
+    .then(function(d){showMsg('cmd-msg', d.ok ? (d.msg||'Done') : ('Error: '+d.error), d.ok)})
+    .catch(function(){showMsg('cmd-msg','Request failed',false)});
+}
+
+var debugOn = false;
+function toggleDebug() {
+  debugOn = !debugOn;
+  postJson('/api/cmd', {debugLog: debugOn}, 'cmd-msg');
+  var btn = document.getElementById('debug-btn');
+  btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');
+  btn.style.color = debugOn ? '#4caf50' : '';
+  btn.style.borderColor = debugOn ? '#4caf50' : '';
+}
+
+// ── Features ───────────────────────────────────────────────────────────────────
+function loadFeatures() {
+  fetch('/api/features')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      document.getElementById('feat-wslog').checked = d.wsLog !== false;
+      document.getElementById('feat-web').checked   = d.web   !== false;
+    })
+    .catch(function(){});
+}
+document.getElementById('feat-web').addEventListener('change', function() {
+  document.getElementById('feat-web-warn').style.display = this.checked ? 'none' : 'block';
+});
+function saveFeatures() {
+  var web   = document.getElementById('feat-web').checked;
+  var wslog = document.getElementById('feat-wslog').checked;
+  if (!web && !confirm('Disabling the web UI requires MQTT to re-enable it. Continue?')) return;
+  fetch('/api/features', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({web: web, wsLog: wslog})})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      showMsg('feat-msg', d.ok ? (d.msg||'Saved') : ('Error: '+d.error), d.ok);
+      if(d.ok) showToast('Saved — reboot to apply');
+    }).catch(function(){showMsg('feat-msg','Request failed',false)});
+}
+
+// ── OTA version check + confirm modal ─────────────────────────────────────────
+function checkOtaVersion() {
+  showMsg('ota-msg', 'Checking...', true);
+  fetch('/api/ota/version')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if (!d.ok) { showMsg('ota-msg', 'Error: ' + (d.error || 'failed'), false); return; }
+      if (d.upToDate) {
+        showMsg('ota-msg', 'Up to date (build ' + escHtml(d.currentBuild) + ')', true);
+      } else {
+        showMsg('ota-msg', '', true);
+        showOtaModal(d);
+      }
+    })
+    .catch(function(){ showMsg('ota-msg', 'Request failed', false); });
+}
+
+function showOtaModal(d) {
+  var body = document.getElementById('ota-modal-body');
+  var btns = document.getElementById('ota-modal-btns');
+  body.innerHTML =
+    'A newer firmware version is available on the OTA server.' +
+    '<div class="ota-ver">Current build: <b>' + escHtml(d.currentBuild) + '</b></div>' +
+    '<div class="ota-ver">Available:&nbsp;&nbsp;&nbsp;&nbsp; <b>' + escHtml(d.remoteBuild) + '</b></div>' +
+    '<div class="ota-warn">&#9888; The device will reboot automatically after flashing.</div>';
+  btns.innerHTML = '';
+  var cancel = document.createElement('button');
+  cancel.className = 'btn';
+  cancel.textContent = 'Cancel';
+  cancel.onclick = closeOtaModal;
+  var flash = document.createElement('button');
+  flash.className = 'btn danger';
+  flash.textContent = 'Flash Now';
+  flash.onclick = function() {
+    closeOtaModal();
+    postJson('/api/cmd', {cmd:'otaCheck'}, 'ota-msg');
+  };
+  btns.appendChild(cancel);
+  btns.appendChild(flash);
+  document.getElementById('ota-modal').style.display = 'flex';
+}
+
+function closeOtaModal() {
+  document.getElementById('ota-modal').style.display = 'none';
+}
+
+// ── OTA upload ─────────────────────────────────────────────────────────────────
+function doOta() {
+  var file = document.getElementById('ota-file').files[0];
+  if (!file) { showMsg('ota-msg','Select a .bin file first',false); return; }
+  var prog = document.getElementById('ota-progress');
+  prog.value = 0; prog.style.display = 'block';
+  var fd = new FormData();
+  fd.append('firmware', file, file.name);
+  var xhr = new XMLHttpRequest();
+  xhr.upload.onprogress = function(e){ if(e.lengthComputable) prog.value=Math.round(e.loaded/e.total*100); };
+  xhr.onload = function(){
+    prog.value=100;
+    try { var d=JSON.parse(xhr.responseText); showMsg('ota-msg',d.ok?'Flashed — rebooting':('Error: '+d.error),d.ok); }
+    catch(e){ showMsg('ota-msg','Done',true); }
+    prog.style.display = 'none';
+  };
+  xhr.onerror = function(){ showMsg('ota-msg','Upload failed',false); prog.style.display='none'; };
+  xhr.open('POST','/api/ota');
+  xhr.send(fd);
+}
+
+// ── Utils ──────────────────────────────────────────────────────────────────────
+function runI2cScan() {
+  var el = document.getElementById('i2c-result');
+  el.innerHTML = '<span class="hint-text">Scanning...</span>';
+  fetch('/api/utils/i2c-scan')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      var devs = d.devices || [];
+      if (!devs.length) { el.innerHTML = '<span class="warn">No devices found</span>'; return; }
+      el.innerHTML = devs.map(function(x){
+        return '<span class="i2c-addr">'+x.hex+'</span>';
+      }).join('');
+    })
+    .catch(function(){el.innerHTML='<span class="err">Scan failed</span>';});
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function postJson(url, body, msgId) {
+  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json()})
+    .then(function(d){showMsg(msgId, d.ok?'OK':('Error: '+d.error), d.ok)})
+    .catch(function(){showMsg(msgId,'Request failed',false)});
+}
+
+function showMsg(id, text, ok) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = text ? '<span class="'+(ok?'ok':'err')+'">'+text+'</span>' : '';
+  if (text) setTimeout(function(){el.textContent='';},3000);
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(function(){ t.classList.remove('show'); }, 4000);
+}
+
+function updateHexSpan(inp) {
+  var v = parseInt(inp.value);
+  var span = inp.nextElementSibling;
+  if (span && !isNaN(v)) span.textContent = '('+v+')';
+}
+
+function pad(n){ return n<10?'0'+n:''+n; }
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── WebSocket log ──────────────────────────────────────────────────────────────
+function connectWs() {
+  var wsUrl = 'ws://'+location.hostname+':81';
+  var ws = new WebSocket(wsUrl);
+  var dot = document.getElementById('ws-dot');
+  var lbl = document.getElementById('ws-label');
+  ws.onopen  = function(){ dot.className='ws-ok'; lbl.textContent='connected to '+wsUrl; };
+  ws.onclose = function(){ dot.className='ws-err'; lbl.textContent='disconnected — retrying in 3s'; setTimeout(connectWs,3000); };
+  ws.onerror = function(){ ws.close(); };
+  ws.onmessage = function(evt){
+    var d; try{d=JSON.parse(evt.data);}catch(e){return;}
+    if (d.l === 'otapct') {
+      var pct = parseInt(d.m);
+      var prog = document.getElementById('ota-progress');
+      prog.style.display = 'block';
+      prog.value = pct;
+      if (pct >= 100) setTimeout(function(){ prog.style.display='none'; }, 2000);
+      d = {t: d.t, m: 'OTA: ' + pct + '%', l: 'info'};
+    }
+    var log = document.getElementById('log');
+    var row = document.createElement('div');
+    row.className = 'log-entry log-'+(d.l||'info');
+    var tsStr;
+    if (bootEpoch !== null && d.t) {
+      var abs = new Date(bootEpoch + d.t);
+      tsStr = pad(abs.getHours())+':'+pad(abs.getMinutes())+':'+pad(abs.getSeconds());
+    } else {
+      var ts = Math.floor((d.t||0)/1000);
+      tsStr = pad(Math.floor(ts/3600))+':'+pad(Math.floor((ts%3600)/60))+':'+pad(ts%60);
+    }
+    row.innerHTML = '<span class="log-ts">'+tsStr+'</span>'
+                  + '<span class="warn">['+(d.l||'info')+']</span> '+escHtml(d.m||'');
+    log.appendChild(row);
+    while(log.children.length>MAX_LOG) log.removeChild(log.firstChild);
+    log.scrollTop = log.scrollHeight;
+  };
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+loadState();
+loadWifi();
+loadMqttConfig();
+loadHwConfig();
+loadSensorSetup();
+loadFeatures();
+connectWs();
+setInterval(loadState, 15000);
+
+// ── Drag & drop ────────────────────────────────────────────────────────────────
+(function(){
+  var src=null, fromHandle=false;
+  document.addEventListener('mouseup',function(){fromHandle=false;});
+  function ds(e){if(!fromHandle){e.preventDefault();return;}src=this;setTimeout(function(){if(src)src.classList.add('dragging');},0);}
+  function de(){fromHandle=false;this.classList.remove('dragging');document.querySelectorAll('.drag-over').forEach(function(x){x.classList.remove('drag-over');});var o=[];document.querySelectorAll('main .draggable-section').forEach(function(x){if(x.id)o.push(x.id);});localStorage.setItem('sOrder',JSON.stringify(o));}
+  function dv(e){e.preventDefault();}
+  function den(e){if(this!==src)this.classList.add('drag-over');}
+  function dl(e){if(!this.contains(e.relatedTarget))this.classList.remove('drag-over');}
+  function dp(e){e.preventDefault();this.classList.remove('drag-over');if(!src||this===src)return;var r=this.getBoundingClientRect();this.parentNode.insertBefore(src,e.clientY<r.top+r.height/2?this:this.nextSibling);}
+  document.querySelectorAll('.draggable-section').forEach(function(el){
+    var h2=el.querySelector('h2');
+    if(h2) h2.addEventListener('mousedown',function(){fromHandle=true;});
+    el.addEventListener('dragstart',ds);el.addEventListener('dragend',de);
+    el.addEventListener('dragover',dv);el.addEventListener('dragenter',den);
+    el.addEventListener('dragleave',dl);el.addEventListener('drop',dp);
+  });
+  var stored=localStorage.getItem('sOrder');
+  if(stored){var anchor=document.getElementById('log-section');try{JSON.parse(stored).forEach(function(id){var el=document.getElementById(id);if(el)anchor.parentNode.insertBefore(el,anchor);});}catch(e){}}
+})();
+
+// ── Section resize ─────────────────────────────────────────────────────────────
+(function(){
+  function getSpan(el){return parseInt(el.getAttribute('data-span')||(el.classList.contains('full')?'3':'1'));}
+  function setSpan(el,n){n=Math.max(1,Math.min(3,n));el.setAttribute('data-span',n);el.style.gridColumn=n>1?'span '+n:'';if(n===3)el.classList.add('full');else el.classList.remove('full');}
+  function saveSpans(){var s={};document.querySelectorAll('.draggable-section').forEach(function(x){if(x.id)s[x.id]=getSpan(x);});localStorage.setItem('sSpans',JSON.stringify(s));}
+  document.querySelectorAll('.draggable-section').forEach(function(el){
+    setSpan(el,getSpan(el));
+    var g=document.createElement('div');g.className='sec-grip';g.textContent='⣿';el.appendChild(g);
+    g.addEventListener('mousedown',function(e){
+      e.stopPropagation();e.preventDefault();
+      var main=document.querySelector('main');
+      var cw=parseFloat(getComputedStyle(main).gridTemplateColumns.split(' ')[0]);
+      var sx=e.clientX,ss=getSpan(el);
+      function mv(e){setSpan(el,ss+Math.round((e.clientX-sx)/(cw+12)));}
+      function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);saveSpans();}
+      document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
+    });
+  });
+  var s=localStorage.getItem('sSpans');
+  if(s){try{var sp=JSON.parse(s);Object.keys(sp).forEach(function(id){var el=document.getElementById(id);if(el)setSpan(el,sp[id]);});}catch(e){}}
+})();
+</script>
+</body>
+</html>
+
+)=====" ;

@@ -59,6 +59,13 @@ static char   s_provisionTopic[80] = {};
 static String s_provisionPayload;
 static bool   s_provisionPending = false;
 
+// ─── WiFi reconnect state ─────────────────────────────────────────────────────
+static uint32_t s_wifiLostAt       = 0;      // millis() when WiFi was lost
+static uint32_t s_lastWifiAttempt  = 0;      // millis() of last WiFi.begin() call
+static bool     s_reconnApRaised   = false;  // true if WE raised the AP during reconnect
+static bool     s_wifiWasConnected = false;  // tracks edge: connected→disconnected
+static bool     s_wifiAltSecondary = false;  // alternates primary/secondary in phase 3
+
 #ifdef ESP8266
 // ── ESP8266 cooperative uplink state machine ──────────────────────────────────
 enum UplinkState { US_AP_WINDOW, US_AP_ONLY, US_CONNECTED };
@@ -78,6 +85,15 @@ static void buildTopic(char* buf, size_t bufLen, const char* suffix) {
              mqttCfgData.prefix,
              (unsigned long)STATE_GET(chipId),
              suffix);
+}
+
+static void publishSleepStatus(uint32_t sleepSec) {
+    char topic[64];
+    char payload[40];
+    buildTopic(topic, sizeof(topic), TOPIC_STATUS_SUFFIX);
+    snprintf(payload, sizeof(payload), "{\"sleepTime\":%lu}", (unsigned long)sleepSec);
+    MQTT_PUBLISH(topic, 0, false, payload);
+    logMessage("MQTT → " + String(topic) + " " + payload, "info");
 }
 
 // ─── Epoch time ───────────────────────────────────────────────────────────────
@@ -211,6 +227,8 @@ static String forceHttp(const char* url) {
 }
 
 static int doHttpOta(const char* url) {
+    ledSetState(LED_OTA);
+    ledUpdate();  // push cyan to hardware immediately before blocking
     String httpUrl = forceHttp(url);
     ESPhttpUpdate.setLedPin(-1);
     ESPhttpUpdate.rebootOnUpdate(false);
@@ -243,6 +261,8 @@ static int doHttpOta(const char* url) {
 }
 #else
 static int doHttpOta(const char* url) {
+    ledSetState(LED_OTA);
+    ledUpdate();  // push cyan to hardware immediately before blocking
     logMessage(String("OTA: fetching ") + url, "info");
     bool isHttps = (strncmp(url, "https", 5) == 0);
 
@@ -428,15 +448,28 @@ static void handleProvisioningConfig(const char* payload) {
     if (!doc["uart_rx"].isNull())  { hw.uart_rx  = doc["uart_rx"].as<int8_t>();   hwChanged = true; }
     if (!doc["uart_tx"].isNull())  { hw.uart_tx  = doc["uart_tx"].as<int8_t>();   hwChanged = true; }
     if (!doc["onewire"].isNull())  { hw.onewire  = doc["onewire"].as<int8_t>();   hwChanged = true; }
-    if (!doc["led_pin"].isNull())  { hw.led_pin  = doc["led_pin"].as<int8_t>();   hwChanged = true; }
+    if (!doc["led_pin"].isNull())  { hw.led_pin  = doc["led_pin"].as<int8_t>();   hwChanged = true; ledInit(hw.led_pin); ledSetState(LED_MQTT_OK); }
     if (!doc["5v_pin"].isNull())   { hw.pin5v    = doc["5v_pin"].as<int8_t>();    hwChanged = true; }
 
     hw.provisioned = true;
     saveHwConfig(hw);
-    if (hwChanged)
-        logMessage("Provision: hwconfig applied", "info");
-    else
+    if (hwChanged) {
+        String hwLog = "Provision: hwconfig applied —";
+        if (!doc["teleIntervalM"].isNull()) hwLog += " teleIntervalM=" + String(hw.teleIntervalM);
+        if (!doc["sampleNum"].isNull())     hwLog += " sampleNum=" + String(hw.sampleNum);
+        if (!doc["onTime"].isNull())        hwLog += " onTime=" + String(hw.onTime);
+        if (!doc["interval"].isNull())      hwLog += " interval=" + String(hw.intervalSec);
+        if (!doc["i2c_sda"].isNull())       hwLog += " sda=" + String(hw.i2c_sda);
+        if (!doc["i2c_scl"].isNull())       hwLog += " scl=" + String(hw.i2c_scl);
+        if (!doc["uart_rx"].isNull())       hwLog += " rx=" + String(hw.uart_rx);
+        if (!doc["uart_tx"].isNull())       hwLog += " tx=" + String(hw.uart_tx);
+        if (!doc["onewire"].isNull())       hwLog += " ow=" + String(hw.onewire);
+        if (!doc["led_pin"].isNull())       hwLog += " led=" + String(hw.led_pin);
+        if (!doc["5v_pin"].isNull())        hwLog += " 5v=" + String(hw.pin5v);
+        logMessage(hwLog, "info");
+    } else {
         logMessage("Provision: no hw fields changed, provisioned flag set", "info");
+    }
 
     if (doc["sensors"].is<JsonArray>()) {
         if (xSemaphoreTake(sensorSetupMutex, pdMS_TO_TICKS(1000))) {
@@ -444,7 +477,14 @@ static void handleProvisioningConfig(const char* payload) {
             xSemaphoreGive(sensorSetupMutex);
         }
         saveSensorSetup();
-        logMessage("Provision: sensor setup applied", "info");
+        sensorsReinit();
+        String sLog = "Provision: sensors —";
+        for (JsonObject s : doc["sensors"].as<JsonArray>()) {
+            sLog += " [" + String(s["type"] | "?");
+            sLog += s["enabled"] | false ? " ON" : " off";
+            sLog += "]";
+        }
+        logMessage(sLog, "info");
     }
 
     if (doc["mqtt"].is<JsonObject>()) {
@@ -456,7 +496,7 @@ static void handleProvisioningConfig(const char* payload) {
         if (!mqtt["prefix"].isNull()) strncpy(cfg.prefix, mqtt["prefix"].as<const char*>(), sizeof(cfg.prefix) - 1);
         if (!mqtt["tls"].isNull())    cfg.tls    = mqtt["tls"].as<bool>();
         saveMqttConfig(cfg);
-        logMessage("Provision: MQTT config applied (takes effect on reconnect)", "info");
+        logMessage(String("Provision: MQTT broker=") + cfg.broker + " port=" + cfg.port + " tls=" + (cfg.tls?"yes":"no") + " (reconnect to apply)", "info");
     }
 }
 
@@ -682,6 +722,84 @@ static void initMqtt() {
                String(mqttCfgData.port) + (mqttCfgData.tls ? " (TLS)" : ""), "info");
 }
 
+// ─── WiFi reconnect helpers ───────────────────────────────────────────────────
+//
+// wifiReconnectTick() implements a three-phase reconnect strategy:
+//   Phase 1 (0..PRIMARY_MS):            retry primary only, every ATTEMPT_MS
+//   Phase 2 (PRIMARY..PRIMARY+SEC_MS):  retry secondary only (if configured)
+//   Phase 3 (PRIMARY+SEC_MS+):          AP raised, alternate primary/secondary every AP_RETRY_MS
+//
+// Call every loop iteration while WiFi.status() != WL_CONNECTED.
+// Call wifiReconnected() once when WiFi.status() == WL_CONNECTED again.
+
+static void wifiReconnectTick(const char* ssid1, const char* pass1,
+                               const char* ssid2, const char* pass2) {
+    uint32_t now     = millis();
+    uint32_t lostFor = now - s_wifiLostAt;
+    bool     hasSec  = (ssid2 && strlen(ssid2) > 0);
+
+    // Raise AP when entering phase 3
+    if (!s_reconnApRaised &&
+            lostFor >= WIFI_RECONN_PRIMARY_MS + WIFI_RECONN_SECONDARY_MS) {
+        s_reconnApRaised = true;
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.softAP(g_apSsid);
+        dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
+        STATE_SET(apMode, true);
+        ledSetState(LED_AP);
+        logMessage(String("No network — AP raised: ") + g_apSsid, "warn");
+    }
+
+    // Rate-limited: phase 3 uses a longer interval to avoid hammering the radio
+    uint32_t retryMs = s_reconnApRaised ? WIFI_RECONN_AP_RETRY_MS : WIFI_RECONN_ATTEMPT_MS;
+    if (now - s_lastWifiAttempt < retryMs) return;
+    s_lastWifiAttempt = now;
+
+    const char* trySsid;
+    const char* tryPass;
+    if (!s_reconnApRaised) {
+        // Phases 1 & 2: straight primary → secondary progression
+        if (lostFor < WIFI_RECONN_PRIMARY_MS || !hasSec) {
+            trySsid = ssid1; tryPass = pass1;
+            logMessage(String("WiFi reconnect → ") + ssid1, "warn");
+        } else {
+            trySsid = ssid2; tryPass = pass2;
+            logMessage(String("WiFi reconnect → ") + ssid2 + " (secondary)", "warn");
+        }
+    } else {
+        // Phase 3: alternate primary / secondary every tick
+        if (hasSec) s_wifiAltSecondary = !s_wifiAltSecondary;
+        if (s_wifiAltSecondary && hasSec) {
+            trySsid = ssid2; tryPass = pass2;
+            logMessage(String("WiFi retry → ") + ssid2, "warn");
+        } else {
+            trySsid = ssid1; tryPass = pass1;
+            logMessage(String("WiFi retry → ") + ssid1, "warn");
+        }
+    }
+    WiFi.disconnect(false);
+    WiFi.begin(trySsid, tryPass);
+}
+
+// Call once when WiFi transitions to connected. Cleans up any reconnect-raised AP.
+static void wifiReconnected() {
+    logMessage("WiFi connected: " + WiFi.localIP().toString(), "info");
+    STATE_SET(wifiConnected, true);
+    s_wifiWasConnected   = true;
+    s_wifiLostAt         = 0;
+    s_lastWifiAttempt    = 0;
+    s_wifiAltSecondary   = false;
+    if (s_reconnApRaised) {
+        dnsServer.stop();
+        WiFi.softAPdisconnect(true);
+        WiFi.mode(WIFI_STA);
+        STATE_SET(apMode, false);
+        s_reconnApRaised = false;
+        logMessage("Network restored — AP closed", "info");
+    }
+    ledSetState(LED_CONNECTED);
+}
+
 // ─── WiFi AP window ───────────────────────────────────────────────────────────
 
 static bool wifiApWindow(const char* ssid1, const char* pass1,
@@ -784,19 +902,29 @@ void uplinkTask(void* pvParameters) {
     bool staConnected = wifiApWindow(wifiSsid, wifiPass, wifiSsid2, wifiPass2);
 
     if (!staConnected) {
-        logMessage("No STA — AP remains up", "warn");
+        // wifiApWindow already exhausted primary+secondary; enter phase 3 immediately
+        logMessage("No STA — AP up, retrying networks", "warn");
         ledSetState(LED_AP);
+        s_reconnApRaised   = true;  // AP already up from wifiApWindow
+        s_wifiLostAt       = millis() - (WIFI_RECONN_PRIMARY_MS + WIFI_RECONN_SECONDARY_MS);
+        s_lastWifiAttempt  = 0;     // trigger first retry immediately
+        s_wifiAltSecondary = false;
         for (;;) {
             dnsServer.processNextRequest();
             MqttCommand cmd;
             if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE) handleCommand(cmd.payload);
             SensorReading r;
             while (xQueueReceive(sensorQueue, &r, 0) == pdTRUE) {}
+            if (WiFi.status() == WL_CONNECTED) {
+                wifiReconnected();
+                break;
+            }
+            wifiReconnectTick(wifiSsid, wifiPass, wifiSsid2, wifiPass2);
             vTaskDelay(pdMS_TO_TICKS(50));
         }
-        return;
     }
 
+    // Tear down AP (idempotent — wifiReconnected() may have already done this)
     dnsServer.stop();
     WiFi.softAPdisconnect(true);
     WiFi.mode(WIFI_STA);
@@ -811,6 +939,7 @@ void uplinkTask(void* pvParameters) {
     SensorReading batch[10];
     uint8_t  batchCount = 0;
     uint32_t lastTele   = 0;
+    s_wifiWasConnected = true;  // WiFi is up at this point
 
     for (;;) {
         MQTT_LOOP();
@@ -819,13 +948,15 @@ void uplinkTask(void* pvParameters) {
 
         SensorReading reading;
         if (xQueueReceive(sensorQueue, &reading, 0) == pdTRUE) {
-            reading.time = getEpochTime();
-            if (batchCount < 10)
-                batch[batchCount++] = reading;
-            else {
-                logMessage("Batch overflow — dropping oldest", "warn");
-                memmove(batch, batch + 1, sizeof(SensorReading) * 9);
-                batch[9] = reading;
+            if (!s_maintenanceMode) {
+                reading.time = getEpochTime();
+                if (batchCount < 10)
+                    batch[batchCount++] = reading;
+                else {
+                    logMessage("Batch overflow — dropping oldest", "warn");
+                    memmove(batch, batch + 1, sizeof(SensorReading) * 9);
+                    batch[9] = reading;
+                }
             }
         }
 
@@ -864,6 +995,7 @@ void uplinkTask(void* pvParameters) {
             if (s_deepSleepMode && !s_maintenanceMode) {
                 uint32_t sleepSec = (uint32_t)STATE_GET(teleIntervalM) * 60UL;
                 logMessage("Deep sleep trigger: flushing MQTT, then sleeping " + String(sleepSec) + "s", "debug");
+                publishSleepStatus(sleepSec);
                 // Flush MQTT outbox before sleeping
                 for (int i = 0; i < 30; i++) { MQTT_LOOP(); vTaskDelay(pdMS_TO_TICKS(10)); }
                 enterDeepSleep(sleepSec);
@@ -887,11 +1019,21 @@ void uplinkTask(void* pvParameters) {
         }
 
         if (WiFi.status() != WL_CONNECTED) {
-            STATE_SET(wifiConnected, false);
+            if (s_wifiWasConnected) {
+                s_wifiWasConnected  = false;
+                s_wifiLostAt        = millis();
+                s_lastWifiAttempt   = 0;
+                s_wifiAltSecondary  = false;
+                STATE_SET(wifiConnected, false);
+                logMessage("WiFi lost", "warn");
+            }
             ledSetState(LED_CONNECTING);
-            logMessage("WiFi lost — reconnecting", "warn");
-            WiFi.begin(wifiSsid, wifiPass);
+            wifiReconnectTick(wifiSsid, wifiPass, wifiSsid2, wifiPass2);
         } else {
+            if (!s_wifiWasConnected) {
+                wifiReconnected();
+                configTzTime(MYTZ, "time.google.com", "pool.ntp.org");
+            }
             STATE_SET(wifiConnected, true);
         }
 
@@ -980,6 +1122,7 @@ void uplinkProcess() {
             WiFi.mode(WIFI_STA);
             STATE_SET(apMode, false);
             STATE_SET(wifiConnected, true);
+            s_wifiWasConnected = true;
             configTzTime(MYTZ, "time.google.com", "pool.ntp.org");
             initMqtt();
             s_uplinkState = US_CONNECTED;
@@ -994,9 +1137,13 @@ void uplinkProcess() {
             logMessage(String("STA fallback -> ") + s_ssid2, "info");
         }
         if (millis() - s_apWindowStart > AP_WINDOW_MS) {
-            logMessage("AP window expired — no STA", "warn");
+            logMessage("AP window expired — no STA, retrying networks", "warn");
             ledSetState(LED_AP);
-            s_uplinkState = US_AP_ONLY;
+            s_uplinkState      = US_AP_ONLY;
+            s_reconnApRaised   = true;  // AP already up from uplinkInit
+            s_wifiLostAt       = millis() - (WIFI_RECONN_PRIMARY_MS + WIFI_RECONN_SECONDARY_MS);
+            s_lastWifiAttempt  = 0;     // trigger first retry immediately
+            s_wifiAltSecondary = false;
         }
         break;
 
@@ -1009,6 +1156,13 @@ void uplinkProcess() {
             SensorReading r;
             while (xQueueReceive(sensorQueue, &r, 0) == pdTRUE) {}
         }
+        wifiReconnectTick(s_ssid, s_pass, s_ssid2, s_pass2);
+        if (WiFi.status() == WL_CONNECTED) {
+            wifiReconnected();  // closes AP, sets LED_CONNECTED
+            configTzTime(MYTZ, "time.google.com", "pool.ntp.org");
+            initMqtt();
+            s_uplinkState = US_CONNECTED;
+        }
         break;
 
     case US_CONNECTED:
@@ -1018,12 +1172,14 @@ void uplinkProcess() {
 
             SensorReading reading;
             if (xQueueReceive(sensorQueue, &reading, 0) == pdTRUE) {
-                reading.time = getEpochTime();
-                if (s_batchCount < 10)
-                    s_batch[s_batchCount++] = reading;
-                else {
-                    memmove(s_batch, s_batch + 1, sizeof(SensorReading) * 9);
-                    s_batch[9] = reading;
+                if (!s_maintenanceMode) {
+                    reading.time = getEpochTime();
+                    if (s_batchCount < 10)
+                        s_batch[s_batchCount++] = reading;
+                    else {
+                        memmove(s_batch, s_batch + 1, sizeof(SensorReading) * 9);
+                        s_batch[9] = reading;
+                    }
                 }
             }
             if (s_provisionPending) {
@@ -1061,6 +1217,7 @@ void uplinkProcess() {
                 if (s_deepSleepMode && !s_maintenanceMode) {
                     uint32_t sleepSec = (uint32_t)STATE_GET(teleIntervalM) * 60UL;
                     logMessage("Deep sleep trigger: flushing MQTT, then sleeping " + String(sleepSec) + "s", "debug");
+                    publishSleepStatus(sleepSec);
                     MQTT_LOOP();
                     delay(200);
                     enterDeepSleep(sleepSec);
@@ -1084,11 +1241,21 @@ void uplinkProcess() {
             }
 
             if (WiFi.status() != WL_CONNECTED) {
-                STATE_SET(wifiConnected, false);
+                if (s_wifiWasConnected) {
+                    s_wifiWasConnected  = false;
+                    s_wifiLostAt        = millis();
+                    s_lastWifiAttempt   = 0;
+                    s_wifiAltSecondary  = false;
+                    STATE_SET(wifiConnected, false);
+                    logMessage("WiFi lost", "warn");
+                }
                 ledSetState(LED_CONNECTING);
-                logMessage("WiFi lost — reconnecting", "warn");
-                WiFi.begin(s_ssid, s_pass);
+                wifiReconnectTick(s_ssid, s_pass, s_ssid2, s_pass2);
             } else {
+                if (!s_wifiWasConnected) {
+                    wifiReconnected();
+                    configTzTime(MYTZ, "time.google.com", "pool.ntp.org");
+                }
                 STATE_SET(wifiConnected, true);
             }
 
