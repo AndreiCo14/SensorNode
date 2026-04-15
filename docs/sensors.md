@@ -20,16 +20,15 @@ A JSON array listing the sensors to use. Each entry must have at least `type` an
 ```
 
 ### `/hwconfig.json`
-Hardware and timing settings. All fields are optional — the board's built-in defaults apply if not set.
+Hardware and timing settings. Pin fields are optional — each firmware build has board-specific defaults compiled in. Only set a pin here if you need to override the default.
+
+**ESP32-C3 defaults:** SDA=6, SCL=7, UART RX=20, TX=21, 5V=9
+**ESP8266 defaults:** SDA=4 (D2), SCL=5 (D1), UART RX=3, TX=1, 5V=15
 
 ```json
 {
-  "i2c_sda": 21,
-  "i2c_scl": 22,
-  "uart_rx": 3,
-  "uart_tx": 1,
-  "onewire": 4,
-  "5v_pin": 13,
+  "i2c_sda": 6,
+  "i2c_scl": 7,
   "interval": 60,
   "teleIntervalM": 30,
   "sampleNum": 1,
