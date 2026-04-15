@@ -21,6 +21,7 @@
 #include <Wire.h>
 
 static SensorBase* sensors[MAX_SENSORS] = {};
+static bool        s_switched[MAX_SENSORS] = {};  // true = powered from switched 5V rail
 static uint8_t     sensorCount = 0;
 static uint8_t     activeCount = 0;
 static HwConfig    hwCfg;
@@ -127,6 +128,7 @@ void sensorsInit() {
                            hwCfg.uart_rx,  hwCfg.uart_tx,
                            hwCfg.onewire);
 
+        s_switched[sensorCount] = entry["switched"] | false;
         sensors[sensorCount++] = s;
         if (ok) activeCount++;
     }
@@ -223,10 +225,22 @@ void sensorsReinit() {
         delete sensors[i];
         sensors[i] = nullptr;
     }
+    memset(s_switched, 0, sizeof(s_switched));
     memset(s_lastData, 0, sizeof(s_lastData));
     sensorsInit();
     s_lastRead = millis();
     s_enabled  = true;
+}
+
+static void reinitSwitchedSensors() {
+    for (uint8_t i = 0; i < sensorCount; i++) {
+        if (sensors[i] && s_switched[i]) {
+            logMessage(String(sensors[i]->type()) + ": reinit after power-on", "debug");
+            sensors[i]->begin(hwCfg.i2c_sda, hwCfg.i2c_scl,
+                              hwCfg.uart_rx,  hwCfg.uart_tx,
+                              hwCfg.onewire);
+        }
+    }
 }
 
 static void doSensorRead() {
@@ -309,7 +323,10 @@ void sensorTask(void* pvParameters) {
                 uint32_t onTimeSec = STATE_GET(onTime);
                 uint32_t powerOnAt = intervalMs > onTimeSec * 1000UL ? intervalMs - onTimeSec * 1000UL : 0;
                 if (elapsed >= powerOnAt) {
-                    if (hwCfg.pin5v >= 0) digitalWrite(hwCfg.pin5v, HIGH);
+                    if (hwCfg.pin5v >= 0) {
+                        digitalWrite(hwCfg.pin5v, HIGH);
+                        reinitSwitchedSensors();
+                    }
                     gpiosOn();
                     s_windowOn = true;
                 }
@@ -338,7 +355,10 @@ void sensorProcess() {
         uint32_t onTimeSec = STATE_GET(onTime);
         uint32_t powerOnAt = intervalMs > onTimeSec * 1000UL ? intervalMs - onTimeSec * 1000UL : 0;
         if (elapsed >= powerOnAt) {
-            if (hwCfg.pin5v >= 0) digitalWrite(hwCfg.pin5v, HIGH);
+            if (hwCfg.pin5v >= 0) {
+                digitalWrite(hwCfg.pin5v, HIGH);
+                reinitSwitchedSensors();
+            }
             gpiosOn();
             s_windowOn = true;
         }

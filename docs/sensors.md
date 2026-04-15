@@ -14,10 +14,17 @@ A JSON array listing the sensors to use. Each entry must have at least `type` an
 ```json
 [
   {"type": "bme280", "enabled": true},
-  {"type": "sht30",  "enabled": true},
+  {"type": "sht30",  "enabled": true, "switched": true},
   {"type": "geiger", "enabled": true, "pin": 5}
 ]
 ```
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | string | Sensor type string (see each sensor below) |
+| `enabled` | bool | Must be `true` to initialise |
+| `addr` | int | I2C address override (decimal). Optional — uses sensor default if omitted |
+| `switched` | bool | Set to `true` if the sensor is powered from the switched 5V rail (`5v_pin`). The sensor will be re-initialized automatically each time the rail powers on. Default: `false` (constant power assumed) |
 
 ### `/hwconfig.json`
 Hardware and timing settings. Pin fields are optional — each firmware build has board-specific defaults compiled in. Only set a pin here if you need to override the default.
