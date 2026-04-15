@@ -1,219 +1,309 @@
 # Supported Sensors
 
-All sensors implement `SensorBase`. The `sensor_manager` calls `begin()` once at startup and `read()` every `intervalM` minutes. `msgType` is an internal tag used during sensor merging; it is not included in the MQTT payload.
+This document describes the sensors supported by SensorNode, how to enable them, and what data they publish.
+
+---
+
+## Configuration
+
+Sensor configuration is stored in two files on the device:
+
+### `/sensorsetup.json`
+A JSON array listing the sensors to use. Each entry must have at least `type` and `enabled`.
+
+```json
+[
+  {"type": "bme280", "enabled": true},
+  {"type": "sht30",  "enabled": true},
+  {"type": "geiger", "enabled": true, "pin": 5}
+]
+```
+
+### `/hwconfig.json`
+Hardware and timing settings. All fields are optional — the board's built-in defaults apply if not set.
+
+```json
+{
+  "i2c_sda": 21,
+  "i2c_scl": 22,
+  "uart_rx": 3,
+  "uart_tx": 1,
+  "onewire": 4,
+  "5v_pin": 13,
+  "interval": 60,
+  "teleIntervalM": 30,
+  "sampleNum": 1,
+  "onTime": 30,
+  "deepSleep": false
+}
+```
+
+| Field | Description | Default |
+|---|---|---|
+| `i2c_sda` / `i2c_scl` | I2C pins (shared by all I2C sensors) | board default |
+| `uart_rx` / `uart_tx` | UART pins (PMS7003) | board default |
+| `onewire` | 1-Wire pin (DS18B20) | board default |
+| `5v_pin` | GPIO controlling an external 5V power rail; switched off between reads | disabled |
+| `gpio<N>` | Controlled GPIO; value is `follow`, `invert`, `on`, or `off` | — |
+| `interval` | How often to read sensors, in seconds | 60 |
+| `teleIntervalM` | How often to send telemetry, in minutes | 30 |
+| `sampleNum` | Number of readings to collect before publishing | 1 |
+| `onTime` | Warm-up time before a read, in seconds (minimum 30) | 30 |
+| `deepSleep` | Sleep between read cycles to save power | false |
 
 ---
 
 ## DS18B20
-**Type string:** `ds18b20` | **msgType:** 201 | **Interface:** 1-Wire
+**Measures:** Temperature | **Interface:** 1-Wire
 
-Configured via `onewire_pin`. Detects device count at init — fails if none found. Reads the first device on the bus (`index 0`).
+Waterproof temperature probe. The 1-Wire pin is set in `hwconfig.json` → `onewire`. Multiple devices on the same bus are supported but only the first one is read.
 
-**JSON output:**
+**Config:**
 ```json
-{"Temp": 23.45}
+{"type": "ds18b20", "enabled": true}
 ```
 
-**Library:** `DallasTemperature` + `OneWire`
+**Published values:**
+| Field | Unit |
+|---|---|
+| `Temp` | °C |
 
 ---
 
 ## BME280
-**Type string:** `bme280` | **msgType:** 202 | **Interface:** I2C | **Default address:** `0x76`
+**Measures:** Temperature, Humidity, Pressure | **Interface:** I2C
 
-Temperature, humidity, and pressure. Pressure is converted from Pa to hPa. Caches last T/H values for use as compensation source by SGP4x.
+All-in-one environmental sensor. Default I2C address is `0x76`; use `addr` (decimal) to override.
 
-**JSON output:**
+**Config:**
 ```json
-{"Temp": 23.45, "Hum": 55.1, "Press": 1013.25}
+{"type": "bme280", "enabled": true}
+{"type": "bme280", "enabled": true, "addr": 119}
 ```
 
-**Library:** `SparkFunBME280`
+**Published values:**
+| Field | Unit |
+|---|---|
+| `Temp` | °C |
+| `Hum` | %RH |
+| `Press` | hPa |
 
 ---
 
 ## SHT30 / SHT31
-**Type string:** `sht30` | **msgType:** 235 | **Interface:** I2C | **Default address:** `0x44`
+**Measures:** Temperature, Humidity | **Interface:** I2C
 
-Temperature and humidity. Returns `false` on NaN (sensor failure).
+Sensirion humidity and temperature sensor. Default address `0x44`; alternate `0x45` (= 69 decimal) when the ADDR pin is high.
 
-**JSON output:**
+**Config:**
 ```json
-{"Temp": 23.45, "Hum": 55.1}
+{"type": "sht30", "enabled": true}
+{"type": "sht30", "enabled": true, "addr": 69}
 ```
 
-**Library:** `Adafruit_SHT31`
+**Published values:**
+| Field | Unit |
+|---|---|
+| `Temp` | °C |
+| `Hum` | %RH |
 
 ---
 
 ## SHT4x
-**Type string:** `sht4x` | **msgType:** 235 | **Interface:** I2C | **Default address:** `0x44`
+**Measures:** Temperature, Humidity | **Interface:** I2C
 
-Temperature and humidity. Configured for high precision, heater disabled. Returns `false` on read failure.
+High-accuracy Sensirion sensor (SHT40/41/43/45). Fixed address `0x44`.
 
-**JSON output:**
+**Config:**
 ```json
-{"Temp": 23.45, "Hum": 55.1}
+{"type": "sht4x", "enabled": true}
 ```
 
-**Library:** `Adafruit_SHT4x`
+**Published values:**
+| Field | Unit |
+|---|---|
+| `Temp` | °C |
+| `Hum` | %RH |
 
 ---
 
 ## HTU21D
-**Type string:** `htu21d` | **msgType:** 235 | **Interface:** I2C | **Fixed address:** `0x40`
+**Measures:** Temperature, Humidity | **Interface:** I2C
 
-Temperature and humidity. Returns `false` on I2C timeout or CRC error. Address is fixed; `begin()` ignores pin parameters.
+Fixed address `0x40`; cannot be changed.
 
-**JSON output:**
+**Config:**
 ```json
-{"Temp": 23.45, "Hum": 55.1}
+{"type": "htu21d", "enabled": true}
 ```
 
-**Library:** `SparkFunHTU21D`
+**Published values:**
+| Field | Unit |
+|---|---|
+| `Temp` | °C |
+| `Hum` | %RH |
 
 ---
 
 ## BMP280
-**Type string:** `bmp280` | **msgType:** 235 | **Interface:** I2C | **Default address:** `0x76`
+**Measures:** Temperature, Pressure | **Interface:** I2C
 
-Temperature and pressure only (no humidity). Pressure converted from Pa to hPa. Uses default `Wire` bus (no explicit `Wire.begin()` — relies on caller or framework init).
+Pressure and temperature only — no humidity. Default address `0x76`.
 
-**JSON output:**
+**Config:**
 ```json
-{"Temp": 23.45, "Press": 1013.25}
+{"type": "bmp280", "enabled": true}
+{"type": "bmp280", "enabled": true, "addr": 119}
 ```
 
-**Library:** `Adafruit_BMP280`
+**Published values:**
+| Field | Unit |
+|---|---|
+| `Temp` | °C |
+| `Press` | hPa |
 
 ---
 
 ## BMP580
-**Type string:** `bmp580` | **msgType:** 235 | **Interface:** I2C | **Default address:** `0x46`
+**Measures:** Temperature, Pressure | **Interface:** I2C
 
-Temperature and pressure. Uses SparkFun BMP581 library (compatible with BMP580). Pressure converted from Pa to hPa.
+High-performance barometric sensor. Default address `0x46`.
 
-**JSON output:**
+**Config:**
 ```json
-{"Temp": 23.45, "Press": 1013.25}
+{"type": "bmp580", "enabled": true}
+{"type": "bmp580", "enabled": true, "addr": 71}
 ```
 
-**Library:** `SparkFun_BMP581_Arduino_Library`
+**Published values:**
+| Field | Unit |
+|---|---|
+| `Temp` | °C |
+| `Press` | hPa |
 
 ---
 
 ## XDB401
-**Type string:** `xdb401` | **msgType:** 235 | **Interface:** I2C | **Default address:** `0x7F`
+**Measures:** Pressure, Temperature | **Interface:** I2C
 
-Digital pressure + temperature sensor. Fullscale is configurable (default 500000 Pa / 0.5 MPa). Each `read()` triggers a measurement via register `0x30/0x0A`, waits 50 ms, then reads raw 24-bit pressure and 16-bit temperature. Both are decoded as signed values.
+Industrial liquid/gas pressure sensor. Default address `0x7F`, full-scale range 0–0.5 MPa. Use `fullscale_pa` to match your sensor's rated range.
 
-**Config options:**
+**Config:**
 ```json
+{"type": "xdb401", "enabled": true}
 {"type": "xdb401", "enabled": true, "fullscale_pa": 1000000}
 ```
 
-**JSON output:**
-```json
-{"Temp": 23.45, "Press": 150.00}
-```
+| Extra field | Description | Default |
+|---|---|---|
+| `fullscale_pa` | Sensor full-scale range in Pa | 500000 (0.5 MPa) |
 
-**No external library** — raw I2C reads via `Wire`.
+**Published values:**
+| Field | Unit |
+|---|---|
+| `Temp` | °C |
+| `Press` | hPa |
 
 ---
 
 ## SGP4x (SGP40 / SGP41)
-**Type string:** `sgp4x` | **msgType:** 235 | **Interface:** I2C | **Fixed address:** `0x59`
+**Measures:** VOC index, NOx index (SGP41 only) | **Interface:** I2C
 
-VOC index sensor. Auto-detects SGP40 (VOC only) vs SGP41 (VOC + NOx) at first `read()` by attempting `measureRawSignals()`; falls back to SGP40 mode on error. Runs one conditioning step at `begin()`.
+Air quality sensor. Outputs a VOC index (1–500 scale; 100 = baseline). The SGP41 variant also outputs a NOx index. The device variant is detected automatically. If a temperature/humidity sensor is active at the same time, it is used for compensation automatically.
 
-Accepts a T/H compensation source (`setCompensationSource()`), wired automatically by `sensor_manager` if a T/H-capable sensor (BME280, SHT30, SHT4x, etc.) is present. Defaults to 25 °C / 50 %RH if no source.
+Fixed address `0x59`.
 
-Raw signals are processed through Sensirion VOC/NOx Gas Index Algorithm libraries to produce index values (1–500 scale).
-
-**JSON output (SGP41):**
+**Config:**
 ```json
-{"VOC": 100, "NOx": 1}
+{"type": "sgp4x", "enabled": true}
 ```
 
-**JSON output (SGP40):**
-```json
-{"VOC": 100}
-```
-
-**Libraries:** `SensirionI2CSgp41`, `Sensirion Gas Index Algorithm`
+**Published values:**
+| Field | Unit | Notes |
+|---|---|---|
+| `VOC` | index (1–500) | SGP40 and SGP41 |
+| `NOx` | index (1–500) | SGP41 only |
 
 ---
 
 ## SCD4x
-**Type string:** `scd4x` | **msgType:** 235 | **Interface:** I2C | **Fixed address:** `0x62`
+**Measures:** CO₂, Temperature, Humidity | **Interface:** I2C
 
-CO₂, temperature, and humidity. Starts periodic measurement at `begin()` (stops any running measurement first). `read()` checks `getDataReadyStatus()` and returns `false` if not ready — no blocking wait.
+Photoacoustic CO₂ sensor (SCD40/41). Fixed address `0x62`.
 
-**JSON output:**
+**Config:**
 ```json
-{"CO2": 850, "Temp": 23.45, "Hum": 55.1}
+{"type": "scd4x", "enabled": true}
 ```
 
-**Library:** `SensirionI2cScd4x`
+**Published values:**
+| Field | Unit |
+|---|---|
+| `CO2` | ppm |
+| `Temp` | °C |
+| `Hum` | %RH |
 
 ---
 
 ## SEN5x (SEN54 / SEN55)
-**Type string:** `sen5x` | **msgType:** 211 | **Interface:** I2C | **Fixed address:** `0x69`
+**Measures:** Particulate matter, Temperature, Humidity, VOC, NOx (SEN55 only) | **Interface:** I2C
 
-Particulate matter, temperature, humidity, and VOC. SEN55 also adds NOx. Auto-detects variant by reading product name at init.
+Sensirion all-in-one air quality module. The SEN54 / SEN55 variant is detected automatically. Fixed address `0x69`.
 
-Starts continuous measurement after a 1.2 s post-reset delay. `read()` checks `readDataReady()` — returns `false` if not ready. Caches last T/H for use as compensation source.
-
-**JSON output (SEN55):**
+**Config:**
 ```json
-{"PM1": 1.2, "PM25": 2.3, "PM4": 3.1, "PM10": 4.0, "Temp": 23.45, "Hum": 55.1, "VOC": 100.0, "NOx": 1.0}
+{"type": "sen5x", "enabled": true}
 ```
 
-**JSON output (SEN54):**
-```json
-{"PM1": 1.2, "PM25": 2.3, "PM4": 3.1, "PM10": 4.0, "Temp": 23.45, "Hum": 55.1, "VOC": 100.0}
-```
-
-**Library:** `SensirionI2CSen5x`
+**Published values:**
+| Field | Unit | Notes |
+|---|---|---|
+| `PMS1` | µg/m³ | PM1.0 |
+| `PMS25` | µg/m³ | PM2.5 |
+| `PMS10` | µg/m³ | PM10 |
+| `Temp` | °C | |
+| `Hum` | %RH | |
+| `VOC` | index (1–500) | |
+| `NOx` | index (1–500) | SEN55 only |
 
 ---
 
 ## PMS7003
-**Type string:** `pms7003` | **msgType:** 240 | **Interface:** UART0 (9600 baud)
+**Measures:** Particulate matter | **Interface:** UART
 
-Particulate matter sensor (PM1.0, PM2.5, PM10). Uses a warm-up / state-machine approach:
+Plantower laser particle counter. Requires a warm-up period before each measurement. The sensor is powered on shortly before the read window and off again after; warm-up duration is set by `onTime` in `hwconfig.json` (minimum 30 s). The 5V supply pin (`5v_pin`) must be configured if the sensor is powered via the controlled rail.
 
-1. **IDLE** → waits until `onTime` seconds before the next scheduled read, then opens `Serial` at 9600 baud and enters WARMING
-2. **WARMING** → parses incoming 32-byte frames (~1/s), stores PM1/2.5/10 values into a 10-entry ring buffer
-3. **DATA_READY** → once `onTime` has elapsed, averages the buffered frames and marks data ready for `read()`
+UART pins are set in `hwconfig.json` (`uart_rx`, `uart_tx`).
 
-`onTime` minimum is 30 s. Averaging is a simple mean over all valid frames received during warm-up (up to 10).
-
-**JSON output:**
+**Config:**
 ```json
-{"PMS1": 1.2, "PMS25": 2.3, "PMS10": 4.0}
+{"type": "pms7003", "enabled": true}
 ```
 
-**No external library** — manual UART frame parsing.
+**Published values:**
+| Field | Unit | Notes |
+|---|---|---|
+| `PMS1` | µg/m³ | PM1.0, averaged over warm-up window |
+| `PMS25` | µg/m³ | PM2.5 |
+| `PMS10` | µg/m³ | PM10 |
 
 ---
 
 ## Geiger Counter
-**Type string:** `geiger` | **msgType:** 210 | **Interface:** GPIO (interrupt)
+**Measures:** Radiation | **Interface:** GPIO
 
-Counts radiation pulses via a FALLING-edge interrupt on a configured GPIO pin (`INPUT_PULLUP`). `read()` requires at least 60 s elapsed since the last read; before that it returns `false`.
+Counts ionising radiation pulses and reports counts per minute (CPM). The GPIO pin must be specified in the sensor config. The minimum measurement window is 60 seconds; with a longer `interval`, CPM is normalised over the actual elapsed time.
 
-CPM is calculated as:
-```
-CPM = pulse_count / (elapsed_ms / 60000)
-```
-
-The counter is reset to zero after each successful read. With `intervalM = N`, the window is exactly N minutes and CPM = raw count / N.
-
-**JSON output:**
+**Config:**
 ```json
-{"Count": 20.0}
+{"type": "geiger", "enabled": true, "pin": 5}
 ```
 
-**No external library** — GPIO interrupt only.
+| Extra field | Description |
+|---|---|
+| `pin` | GPIO pin connected to the Geiger tube pulse output (required) |
+
+**Published values:**
+| Field | Unit |
+|---|---|
+| `Count` | CPM (counts per minute) |

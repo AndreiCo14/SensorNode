@@ -56,14 +56,14 @@ bool Sen5xSensor::read(SensorReading& r) {
 
     if (_hasNox && !isnan(nox)) {
         snprintf(r.data, sizeof(r.data),
-                 "{\"PM1\":%.1f,\"PM25\":%.1f,\"PM4\":%.1f,\"PM10\":%.1f"
+                 "{\"PMS1\":%.1f,\"PMS25\":%.1f,\"PMS10\":%.1f"
                  ",\"Temp\":%.2f,\"Hum\":%.1f,\"VOC\":%.0f,\"NOx\":%.0f}",
-                 pm1p0, pm2p5, pm4p0, pm10p0, temp, hum, voc, nox);
+                 pm1p0, pm2p5, pm10p0, temp, hum, voc, nox);
     } else {
         snprintf(r.data, sizeof(r.data),
-                 "{\"PM1\":%.1f,\"PM25\":%.1f,\"PM4\":%.1f,\"PM10\":%.1f"
+                 "{\"PMS1\":%.1f,\"PMS25\":%.1f,\"PMS10\":%.1f"
                  ",\"Temp\":%.2f,\"Hum\":%.1f,\"VOC\":%.0f}",
-                 pm1p0, pm2p5, pm4p0, pm10p0, temp, hum, voc);
+                 pm1p0, pm2p5, pm10p0, temp, hum, voc);
     }
     return true;
 }
