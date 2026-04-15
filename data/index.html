@@ -113,7 +113,8 @@ textarea{width:100%;background:var(--bg-input);border:1px solid var(--border);co
 .sensor-card .sc-type{color:var(--accent);font-size:12px;flex:1}
 .sensor-card .sc-fields{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
 .sensor-card .sc-field{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted)}
-.sensor-card .sc-field input{width:56px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:2px 4px;border-radius:2px;font-size:11px}
+.sensor-card .sc-field input,.sensor-card .sc-field select{width:56px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:2px 4px;border-radius:2px;font-size:11px}
+.sensor-card .sc-field select{width:auto}
 .sc-fixed-addr{color:var(--text-dim);font-size:10px}
 .sc-note{font-size:10px;color:var(--text-muted);font-style:italic;width:100%;margin-top:2px}
 .sc-values{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;padding-top:4px;border-top:1px solid var(--border)}
@@ -246,6 +247,8 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
     <div class="form-row"><label>UART TX</label><input type="number" id="hw-utx" min="-1" max="48"></div>
     <div class="form-row"><label>1-Wire pin</label><input type="number" id="hw-ow" min="-1" max="48"></div>
     <div class="form-row"><label>LED pin</label><input type="number" id="hw-led" min="-1" max="48" title="-1 = disabled"></div>
+    <div id="gpio-list"></div>
+    <button class="btn-sm" onclick="addGpioRow(-1,'invert')">+ GPIO</button>
     <button class="btn" onclick="saveHwConfig()">Save</button>
     <div class="msg" id="hw-msg"></div>
   </section>
@@ -520,7 +523,23 @@ function loadHwConfig() {
     document.getElementById('hw-utx').value = d.uart_tx !== undefined ? d.uart_tx : 1;
     document.getElementById('hw-ow').value  = d.onewire !== undefined ? d.onewire : 2;
     document.getElementById('hw-led').value = d.led_pin !== undefined ? d.led_pin : -1;
+    document.getElementById('gpio-list').innerHTML = '';
+    Object.keys(d).forEach(function(k) {
+      if (/^gpio\d+$/.test(k)) addGpioRow(parseInt(k.slice(4)), d[k]);
+    });
   }).catch(function(){});
+}
+
+function addGpioRow(pin, mode) {
+  var row = document.createElement('div');
+  row.className = 'gpio-row form-row';
+  row.innerHTML = '<label>GPIO pin</label>'
+    + '<input type="number" class="gpio-pin" min="0" max="48" value="'+(pin>=0?pin:'')+'" style="width:52px">'
+    + ' <select class="gpio-mode">'
+    + ['follow','invert','on','off'].map(function(o){return '<option'+(o===mode?' selected':'')+'>'+o+'</option>';}).join('')
+    + '</select>'
+    + ' <button class="btn-sm" onclick="this.parentNode.remove()">✕</button>';
+  document.getElementById('gpio-list').appendChild(row);
 }
 
 function saveHwConfig() {
@@ -532,6 +551,11 @@ function saveHwConfig() {
     onewire: parseInt(document.getElementById('hw-ow').value),
     led_pin: parseInt(document.getElementById('hw-led').value)
   };
+  document.querySelectorAll('#gpio-list .gpio-row').forEach(function(row) {
+    var pin = parseInt(row.querySelector('.gpio-pin').value);
+    var mode = row.querySelector('.gpio-mode').value;
+    if (!isNaN(pin) && pin >= 0) body['gpio' + pin] = mode;
+  });
   fetch('/api/hw/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
     .then(function(r){return r.json()})
     .then(function(d){
@@ -554,6 +578,7 @@ var SENSOR_TYPES = [
   {type:'ds18b20', label:'DS18B20',      fields:[]},
   {type:'pms7003', label:'PMS7003',      fields:[]},
   {type:'geiger',  label:'Geiger Counter', fields:[{key:'pin', label:'GPIO pin', def:14, fmt:'num', note:'Avoid pins used by UART/I2C/OneWire'}]},
+  {type:'sen5x',   label:'SEN54/55',      fixedAddr:0x69, fields:[]},
 ];
 
 var sensorSetupData = [];
@@ -561,7 +586,8 @@ var UNITS = {
   Temp:'°C', Hum:'%', Press:'hPa',
   CO2:'ppm', VOC:'idx', NOx:'idx',
   PMS1:'µg/m³', PMS25:'µg/m³', PMS10:'µg/m³',
-  CPM:'cpm'
+  PM1:'µg/m³', PM25:'µg/m³', PM4:'µg/m³', PM10:'µg/m³',
+  Count:'cpm'
 };
 
 function buildSensorCard(st, entry, values) {
@@ -581,6 +607,10 @@ function buildSensorCard(st, entry, values) {
       fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
         +'<input type="number" data-type="'+st.type+'" data-key="'+f.key+'" data-fmt="num"'+(f.div?' data-div="'+f.div+'"':'')+' value="'+dispVal+'" step="any" style="width:64px"></div>';
       if (f.note) fieldsHtml += '<div class="sc-note">⚠ '+f.note+'</div>';
+    } else if (f.fmt === 'select') {
+      var opts = f.options.map(function(o){return '<option value="'+o+'"'+(o===val?' selected':'')+'>'+o+'</option>';}).join('');
+      fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
+        +'<select data-type="'+st.type+'" data-key="'+f.key+'" data-fmt="select">'+opts+'</select></div>';
     } else {
       var hexVal = '0x' + val.toString(16);
       fieldsHtml += '<div class="sc-field"><span>'+f.label+'</span>'
@@ -641,8 +671,11 @@ function saveSensorSetup() {
     var cb  = document.querySelector('input[type=checkbox][data-type="'+st.type+'"]');
     var obj = {type: st.type, enabled: cb ? cb.checked : false};
     st.fields.forEach(function(f){
-      var inp = document.querySelector('input[data-type="'+st.type+'"][data-key="'+f.key+'"]');
-      if (inp) obj[f.key] = f.fmt === 'num' ? parseFloat(inp.value) * (f.div || 1) : parseInt(inp.value);
+      var el = document.querySelector('[data-type="'+st.type+'"][data-key="'+f.key+'"]');
+      if (!el) return;
+      if (f.fmt === 'num')    obj[f.key] = parseFloat(el.value) * (f.div || 1);
+      else if (f.fmt === 'select') obj[f.key] = el.value;
+      else                    obj[f.key] = parseInt(el.value);
     });
     result.push(obj);
   });

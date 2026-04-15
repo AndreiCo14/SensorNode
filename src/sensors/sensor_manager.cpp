@@ -11,6 +11,7 @@
 #include "htu21d_sensor.h"
 #include "xdb401_sensor.h"
 #include "geiger_sensor.h"
+#include "sen5x_sensor.h"
 #include "../logger.h"
 #include "../queues.h"
 #include "../system_state.h"
@@ -51,6 +52,7 @@ static SensorBase* makeSensor(const char* type) {
     if (strcmp(type, "htu21d")  == 0) return new Htu21dSensor();
     if (strcmp(type, "xdb401")  == 0) return new Xdb401Sensor();
     if (strcmp(type, "geiger")  == 0) return new GeigerSensor();
+    if (strcmp(type, "sen5x")   == 0) return new Sen5xSensor();
     return nullptr;
 }
 
@@ -96,12 +98,7 @@ void sensorsInit() {
         if (fullscale_pa > 0 && strcmp(type, "xdb401") == 0)
             static_cast<Xdb401Sensor*>(s)->setFullscalePa(fullscale_pa);
 
-        // PMS7003: power pin from HwConfig; SET pin optional (default -1 = not connected)
-        if (strcmp(type, "pms7003") == 0) {
-            int8_t setPin = entry["set_pin"].isNull() ? (int8_t)-1 : entry["set_pin"].as<int8_t>();
-            bool   setInv = entry["set_inverted"] | true;
-            static_cast<Pms7003Sensor*>(s)->setPins(hwCfg.pin5v, setPin, setInv);
-        }
+        // PMS7003: power and aux pin managed by sensor_manager; no per-sensor pin config needed
 
         // Geiger counter: GPIO pin from sensor config
         if (strcmp(type, "geiger") == 0) {
@@ -165,12 +162,39 @@ void sensorsInit() {
 static uint16_t s_readingSeq  = 0;
 static uint32_t s_lastRead    = 0;
 static bool     s_enabled     = false;
+static bool     s_windowOn        = false;
+
+static void gpiosOn() {
+    for (uint8_t i = 0; i < hwCfg.gpio_count; i++) {
+        if (hwCfg.gpio_pin[i] < 0) continue;
+        const char* m = hwCfg.gpio_mode[i];
+        if      (strncmp(m, "follow", 6) == 0) digitalWrite(hwCfg.gpio_pin[i], HIGH);
+        else if (strncmp(m, "invert", 6) == 0) digitalWrite(hwCfg.gpio_pin[i], LOW);
+        // "on"/"off": fixed level set at boot, don't change
+    }
+}
+
+static void gpiosOff() {
+    for (uint8_t i = 0; i < hwCfg.gpio_count; i++) {
+        if (hwCfg.gpio_pin[i] < 0) continue;
+        const char* m = hwCfg.gpio_mode[i];
+        if      (strncmp(m, "follow", 6) == 0) digitalWrite(hwCfg.gpio_pin[i], LOW);
+        else if (strncmp(m, "invert", 6) == 0) digitalWrite(hwCfg.gpio_pin[i], HIGH);
+        // "on"/"off": fixed level, don't change
+    }
+}
 
 void sensorsEnable() {
     if (s_enabled) return;
-    s_enabled  = true;
-    s_lastRead = millis();  // start interval timer; PMS will trigger first combined read
-    logMessage("Sensors enabled — awaiting first cycle", "info");
+    s_enabled = true;
+    // Backdate s_lastRead so the first read fires after onTime seconds,
+    // giving sensors time to warm up before the first measurement is taken.
+    uint16_t onTimeSec  = STATE_GET(onTime);
+    uint32_t intervalMs = (uint32_t)STATE_GET(teleIntervalM) * 60000UL;
+    if (intervalMs == 0) intervalMs = 60000UL;
+    uint32_t readDelayMs = (uint32_t)onTimeSec * 1000UL;
+    s_lastRead = millis() - intervalMs + readDelayMs;
+    logMessage("Sensors enabled — first read in " + String(onTimeSec) + "s", "info");
 }
 
 void sensorsEnableDeepSleep() {
@@ -189,6 +213,11 @@ void sensorsEnableDeepSleep() {
 
 void sensorsReinit() {
     s_enabled = false;
+    if (s_windowOn) {
+        if (hwCfg.pin5v >= 0) digitalWrite(hwCfg.pin5v, LOW);
+        gpiosOff();
+        s_windowOn = false;
+    }
     vTaskDelay(pdMS_TO_TICKS(20));  // let sensorTask finish current tick
     for (uint8_t i = 0; i < sensorCount; i++) {
         delete sensors[i];
@@ -274,9 +303,23 @@ void sensorTask(void* pvParameters) {
             uint16_t intervalM = STATE_GET(teleIntervalM);
             if (intervalM == 0) intervalM = 1;
             uint32_t intervalMs = (uint32_t)intervalM * 60000UL;
+            uint32_t elapsed = now - s_lastRead;
             tickAllSensors(s_lastRead + intervalMs);
-            if (now - s_lastRead >= intervalMs)
+            if (!s_windowOn) {
+                uint32_t onTimeSec = STATE_GET(onTime);
+                uint32_t powerOnAt = intervalMs > onTimeSec * 1000UL ? intervalMs - onTimeSec * 1000UL : 0;
+                if (elapsed >= powerOnAt) {
+                    if (hwCfg.pin5v >= 0) digitalWrite(hwCfg.pin5v, HIGH);
+                    gpiosOn();
+                    s_windowOn = true;
+                }
+            }
+            if (elapsed >= intervalMs) {
                 doSensorRead();
+                if (hwCfg.pin5v >= 0) digitalWrite(hwCfg.pin5v, LOW);
+                gpiosOff();
+                s_windowOn = false;
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -289,8 +332,22 @@ void sensorProcess() {
     uint16_t intervalM = STATE_GET(teleIntervalM);
     if (intervalM == 0) intervalM = 1;
     uint32_t intervalMs = (uint32_t)intervalM * 60000UL;
+    uint32_t elapsed = now - s_lastRead;
     tickAllSensors(s_lastRead + intervalMs);
-    if (now - s_lastRead >= intervalMs)
+    if (!s_windowOn) {
+        uint32_t onTimeSec = STATE_GET(onTime);
+        uint32_t powerOnAt = intervalMs > onTimeSec * 1000UL ? intervalMs - onTimeSec * 1000UL : 0;
+        if (elapsed >= powerOnAt) {
+            if (hwCfg.pin5v >= 0) digitalWrite(hwCfg.pin5v, HIGH);
+            gpiosOn();
+            s_windowOn = true;
+        }
+    }
+    if (elapsed >= intervalMs) {
         doSensorRead();
+        if (hwCfg.pin5v >= 0) digitalWrite(hwCfg.pin5v, LOW);
+        gpiosOff();
+        s_windowOn = false;
+    }
 }
 #endif

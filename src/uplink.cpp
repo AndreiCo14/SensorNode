@@ -24,8 +24,9 @@ static espMqttClientSecure* mqttSecure = nullptr;
 // directly inside the CONNACK callback, where the library outbox state may not
 // be fully settled yet (causing spurious subscribe() failures).
 static bool s_needsSubscribe      = false;
-static bool s_publishStartSent    = false;
-static bool s_subscribeFailLogged = false;  // suppress log spam on repeated failures
+static bool     s_publishStartSent    = false;
+static bool     s_subscribeFailLogged = false;  // suppress log spam on repeated failures
+static uint32_t s_connectedAtMs      = 0;       // millis() when CONNACK received
 static char s_cmdTopic[64]        = {};
 static bool s_deepSleepMode       = false;  // enter sleep after each publish cycle
 static bool s_maintenanceMode     = false;  // inhibit sleep; set by maintenance:true in Start reply
@@ -450,6 +451,22 @@ static void handleProvisioningConfig(const char* payload) {
     if (!doc["onewire"].isNull())  { hw.onewire  = doc["onewire"].as<int8_t>();   hwChanged = true; }
     if (!doc["led_pin"].isNull())  { hw.led_pin  = doc["led_pin"].as<int8_t>();   hwChanged = true; ledInit(hw.led_pin); ledSetState(LED_MQTT_OK); }
     if (!doc["5v_pin"].isNull())   { hw.pin5v    = doc["5v_pin"].as<int8_t>();    hwChanged = true; }
+    // Parse all gpio# keys from provision payload (any present gpio# replaces the whole set)
+    {
+        uint8_t n = 0;
+        bool found = false;
+        for (JsonPair kv : doc.as<JsonObject>()) {
+            const char* key = kv.key().c_str();
+            if (strncmp(key, "gpio", 4) != 0 || !isdigit((unsigned char)key[4])) continue;
+            if (!found) { for (uint8_t i = 0; i < HwConfig::GPIO_CTRL_MAX; i++) hw.gpio_pin[i] = -1; found = true; }
+            if (n >= HwConfig::GPIO_CTRL_MAX) break;
+            hw.gpio_pin[n] = (int8_t)atoi(key + 4);
+            strncpy(hw.gpio_mode[n], kv.value() | "invert", 7);
+            hw.gpio_mode[n][7] = '\0';
+            n++;
+        }
+        if (found) { hw.gpio_count = n; hwChanged = true; }
+    }
 
     hw.provisioned = true;
     saveHwConfig(hw);
@@ -466,12 +483,33 @@ static void handleProvisioningConfig(const char* payload) {
         if (!doc["onewire"].isNull())       hwLog += " ow=" + String(hw.onewire);
         if (!doc["led_pin"].isNull())       hwLog += " led=" + String(hw.led_pin);
         if (!doc["5v_pin"].isNull())        hwLog += " 5v=" + String(hw.pin5v);
+        for (uint8_t i = 0; i < hw.gpio_count; i++)
+            if (hw.gpio_pin[i] >= 0) hwLog += " gpio" + String(hw.gpio_pin[i]) + "=" + hw.gpio_mode[i];
         logMessage(hwLog, "info");
     } else {
         logMessage("Provision: no hw fields changed, provisioned flag set", "info");
     }
 
     if (doc["sensors"].is<JsonArray>()) {
+        // Migration: old format stored set_pin/set_inverted inside the pms7003 sensor entry.
+        // If no gpio# keys were in this payload, promote set_pin as gpio<N>.
+        if (hw.gpio_count == 0) {
+            for (JsonObject s : doc["sensors"].as<JsonArray>()) {
+                if (strcmp(s["type"] | "", "pms7003") == 0 && !s["set_pin"].isNull()) {
+                    int8_t pin = s["set_pin"].as<int8_t>();
+                    bool inv = s["set_inverted"] | true;
+                    if (pin >= 0 && hw.gpio_count < HwConfig::GPIO_CTRL_MAX) {
+                        hw.gpio_pin[hw.gpio_count] = pin;
+                        strncpy(hw.gpio_mode[hw.gpio_count], inv ? "invert" : "follow", 7);
+                        hw.gpio_count++;
+                        saveHwConfig(hw);
+                        logMessage("Provision: migrated pms7003 set_pin → gpio" +
+                                   String(pin) + "=" + hw.gpio_mode[hw.gpio_count - 1], "info");
+                    }
+                    break;
+                }
+            }
+        }
         if (xSemaphoreTake(sensorSetupMutex, pdMS_TO_TICKS(1000))) {
             sensorSetupData.set(doc["sensors"]);
             xSemaphoreGive(sensorSetupMutex);
@@ -636,10 +674,11 @@ static void onMqttConnect(bool) {
              mqttCfgData.prefix,
              (unsigned long)STATE_GET(chipId),
              TOPIC_PROVISION_SUFFIX);
-    s_needsSubscribe     = true;
-    s_publishStartSent   = false;
+    s_needsSubscribe      = true;
+    s_publishStartSent    = false;
     s_subscribeFailLogged = false;
-    s_provisionPending   = false;
+    s_provisionPending    = false;
+    s_connectedAtMs       = millis();
 }
 
 static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
@@ -654,13 +693,14 @@ static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
 
 static void onMqttSubscribe(uint16_t packetId, const espMqttClientTypes::SubscribeReturncode* codes, size_t len) {
     for (size_t i = 0; i < len; ++i) {
-        if (codes[i] == espMqttClientTypes::SubscribeReturncode::FAIL) {
+        if (codes[i] == espMqttClientTypes::SubscribeReturncode::FAIL)
             logMessage("Subscribe ACK REJECTED (id:" + String(packetId) + ")", "error");
-            publishStart();  // still announce even if subscription failed
-        } else {
+        else
             logMessage("Subscribe ACK ok (id:" + String(packetId) + ")", "info");
-            publishStart();  // subscription confirmed — safe to announce
-        }
+    }
+    if (!s_publishStartSent) {
+        publishStart();
+        s_publishStartSent = true;
     }
 }
 
@@ -714,7 +754,7 @@ static void initMqtt() {
         mqttPlain->onMessage(onMqttMessage);
         mqttPlain->setServer(mqttCfgData.broker, mqttCfgData.port);
         mqttPlain->setClientId(sysname);
-        mqttPlain->setKeepAlive(120);
+        mqttPlain->setKeepAlive(60);
         mqttPlain->setCleanSession(true);
         mqttPlain->connect();
     }
@@ -863,6 +903,9 @@ static bool wifiApWindow(const char* ssid1, const char* pass1,
 
 static void tryDeferredSubscribe() {
     if (!s_needsSubscribe || !MQTT_CONNECTED()) return;
+    // Wait 500 ms after CONNACK before subscribing — gives the TCP connection
+    // time to settle on slow/mobile links before we send the SUBSCRIBE packet.
+    if (millis() - s_connectedAtMs < 500) return;
     uint16_t subId = 0;
     if (mqttSecure) subId = mqttSecure->subscribe(s_cmdTopic, 0);
     else if (mqttPlain) subId = mqttPlain->subscribe(s_cmdTopic, 0);

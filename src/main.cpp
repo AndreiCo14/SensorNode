@@ -104,7 +104,13 @@ void setup() {
     {
         HwConfig hw;
         loadHwConfig(hw);
-        if (hw.pin5v >= 0) { pinMode(hw.pin5v, OUTPUT); digitalWrite(hw.pin5v, HIGH); }
+        if (hw.pin5v >= 0) { pinMode(hw.pin5v, OUTPUT); digitalWrite(hw.pin5v, LOW); }
+        for (uint8_t i = 0; i < hw.gpio_count; i++) {
+            if (hw.gpio_pin[i] < 0) continue;
+            bool initHigh = (strncmp(hw.gpio_mode[i], "invert", 6) == 0 || strncmp(hw.gpio_mode[i], "on", 2) == 0);
+            pinMode(hw.gpio_pin[i], OUTPUT);
+            digitalWrite(hw.gpio_pin[i], initHigh ? HIGH : LOW);
+        }
         ledInit(hw.led_pin);
         // Override RAM defaults with persisted values
         STATE_LOCK();
@@ -116,7 +122,8 @@ void setup() {
 
     // ── Init sensors ──
     sensorsInit();
-    sensorsEnable();  // start immediately; MQTT connect is not required
+    // sensorsEnable() is called by uplinkTask after the MQTT startup window
+    // so config commands (teleIntervalM, onTime) arrive before the first read.
 
     // ── NTP (best-effort; syncs after WiFi connects) ──
     configTzTime(MYTZ, "time.google.com", "pool.ntp.org");

@@ -34,7 +34,7 @@ bool GeigerSensor::read(SensorReading& r) {
 
     uint32_t now     = millis();
     uint32_t elapsed = now - _lastReadMs;
-    if (elapsed == 0) elapsed = 1;
+    if (elapsed < 60000UL) return false;  // need at least 1 minute for a valid CPM
 
     noInterrupts();
     uint32_t count = s_pulseCount;
@@ -45,7 +45,9 @@ bool GeigerSensor::read(SensorReading& r) {
 
     float cpm = (float)count / ((float)elapsed / 60000.0f);
 
+    logMessage("Geiger: count=" + String(count) + " elapsed=" + String(elapsed / 1000) + "s CPM=" + String(cpm, 1), "debug");
+
     r.msgType = msgType();
-    snprintf(r.data, sizeof(r.data), "{\"CPM\":%.1f}", cpm);
+    snprintf(r.data, sizeof(r.data), "{\"Count\":%.1f}", cpm);
     return true;
 }
