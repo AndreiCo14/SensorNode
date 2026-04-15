@@ -45,6 +45,8 @@ bool GeigerSensor::read(SensorReading& r) {
 
     float cpm = (float)count / ((float)elapsed / 60000.0f);
 
+    logMessage("Geiger: count=" + String(count) + " elapsed=" + String(elapsed / 1000) + "s CPM=" + String(cpm, 1), "debug");
+
     r.msgType = msgType();
     snprintf(r.data, sizeof(r.data), "{\"Count\":%.1f}", cpm);
     return true;
