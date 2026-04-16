@@ -581,6 +581,7 @@ static void handleCommand(const char* payload) {
 
     if (!doc["deepSleep"].isNull()) {
         s_deepSleepMode = doc["deepSleep"].as<bool>();
+        logMessage(String("deepSleep -> ") + (s_deepSleepMode ? "on" : "off"), "info");
         needsSave = true;
     }
 
@@ -600,9 +601,6 @@ static void handleCommand(const char* payload) {
         setDebugLog(en);
         logMessage(String("debugLog -> ") + (en ? "on" : "off"), "info");
     }
-
-    if (!doc["deepSleep"].isNull())
-        logMessage(String("deepSleep -> ") + (s_deepSleepMode ? "on" : "off"), "info");
 
     // maintenance:true  — pause deep sleep cycle, stay online (set in Start reply)
     // maintenance:false — resume deep sleep cycle (sent as subsequent cmd)
