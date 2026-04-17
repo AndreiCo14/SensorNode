@@ -40,7 +40,7 @@ static const uint8_t INDEX_HTML_GZ[] PROGMEM = {{
 }};
 """
 
-with open(DST, "w") as f:
+with open(DST, "w", encoding="utf-8") as f:
     f.write(header)
 
 print(f"gen_html.py: {len(raw)} → {len(compressed)} bytes ({len(compressed)*100//len(raw)}%)")
