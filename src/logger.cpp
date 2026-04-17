@@ -8,10 +8,13 @@
 static WebSocketsServer wsServer(81);
 static bool wsStarted = false;
 static bool debugLogEnabled = false;
+static bool maintenanceModeEnabled = false;
 static bool s_wsEnabled = true;
 
 void setDebugLog(bool en) { debugLogEnabled = en; }
 bool getDebugLog()        { return debugLogEnabled; }
+void setMaintenanceMode(bool en) { maintenanceModeEnabled = en; }
+bool getMaintenanceMode()        { return maintenanceModeEnabled; }
 void loggerSetWsEnabled(bool en) { s_wsEnabled = en; }
 
 static LogEntry ringBuffer[LOG_RING_SIZE];

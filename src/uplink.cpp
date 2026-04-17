@@ -1100,6 +1100,10 @@ void uplinkTask(void* pvParameters) {
 #ifdef ESP8266
 // ─── ESP8266 cooperative uplink ───────────────────────────────────────────────
 
+bool getMaintenanceMode() {
+    return s_maintenanceMode;
+}
+
 void uplinkInit() {
     loadMqttConfig(mqttCfgData);
     { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; }

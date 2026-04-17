@@ -390,6 +390,18 @@ function loadState() {
       btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');
       btn.style.color = debugOn ? '#4caf50' : '';
       btn.style.borderColor = debugOn ? '#4caf50' : '';
+      
+      maintOn = !!d.maintenance;
+      var maintBtn = document.getElementById('maint-btn');
+      maintBtn.textContent = 'Maintenance Mode: '+(maintOn?'ON':'OFF');
+      maintBtn.style.color = maintOn ? '#e65100' : '';
+      maintBtn.style.borderColor = maintOn ? '#e65100' : '';
+      
+      sleapOn = !!d.deepSleep;
+      var sleapBtn = document.getElementById('sleap-btn');
+      sleapBtn.textContent = 'DeepSleap: '+(sleapOn?'ON':'OFF');
+      sleapBtn.style.color = sleapOn ? '#e65100' : '';
+      sleapBtn.style.borderColor = sleapOn ? '#e65100' : '';
     })
     .catch(function(){set('s-wifi','<span class="err">fetch failed</span>')});
   loadSensorValues();
@@ -914,6 +926,26 @@ function connectWs() {
       prog.value = pct;
       if (pct >= 100) setTimeout(function(){ prog.style.display='none'; }, 2000);
       d = {t: d.t, m: 'OTA: ' + pct + '%', l: 'info'};
+    }
+    // Handle command echo for maintenance and deepSleep state updates
+    if (d.m && d.m.indexOf('cmd') !== -1) {
+      try {
+        var cmdMatch = d.m.match(/\{"deepSleep":(true|false),"maintenance":(true|false)/);
+        if (cmdMatch) {
+          var dsVal = cmdMatch[1] === 'true';
+          var maintVal = cmdMatch[2] === 'true';
+          sleapOn = dsVal;
+          var sleapBtn = document.getElementById('sleap-btn');
+          sleapBtn.textContent = 'DeepSleap: '+(sleapOn?'ON':'OFF');
+          sleapBtn.style.color = sleapOn ? '#e65100' : '';
+          sleapBtn.style.borderColor = sleapOn ? '#e65100' : '';
+          maintOn = maintVal;
+          var maintBtn = document.getElementById('maint-btn');
+          maintBtn.textContent = 'Maintenance Mode: '+(maintOn?'ON':'OFF');
+          maintBtn.style.color = maintOn ? '#e65100' : '';
+          maintBtn.style.borderColor = maintOn ? '#e65100' : '';
+        }
+      } catch(e) {}
     }
     var log = document.getElementById('log');
     var row = document.createElement('div');
