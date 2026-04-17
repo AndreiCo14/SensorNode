@@ -276,6 +276,7 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
       <button class="btn" onclick="sendCmd({cmd:'telemetry'})">Send Telemetry</button>
       <button class="btn" id="debug-btn" onclick="toggleDebug()">Debug Log: OFF</button>
       <button class="btn" id="maint-btn" onclick="toggleMaintenance()">Maintenance Mode: OFF</button>
+      <button class="btn" id="sleap-btn" onclick="toggleDeepSleap()">DeepSleap: OFF</button>
     </div>
     <div class="cmd-divider">
       <div class="sublabel" style="margin-bottom:6px">Provision Config</div>
@@ -737,11 +738,20 @@ function toggleDebug() {
 var maintOn = false;
 function toggleMaintenance() {
   maintOn = !maintOn;
-  postJson('/api/cmd', {maintenanceMode: maintOn}, 'cmd-msg');
+  postJson('/api/cmd', {maintenance: maintOn}, 'cmd-msg');
   var btn = document.getElementById('maint-btn');
   btn.textContent = 'Maintenance Mode: '+(maintOn?'ON':'OFF');
   btn.style.color = maintOn ? '#e65100' : '';
   btn.style.borderColor = maintOn ? '#e65100' : '';
+
+var sleapOn = false;
+function toggleDeepSleap() {
+  sleapOn = !sleapOn;
+  postJson('/api/cmd', {deepSleep: sleapOn}, 'cmd-msg');
+  var btn = document.getElementById('sleap-btn');
+  btn.textContent = 'DeepSleap: '+(sleapOn?'ON':'OFF');
+  btn.style.color = sleapOn ? '#e65100' : '';
+  btn.style.borderColor = sleapOn ? '#e65100' : '';
 }
 
 // ── Features ───────────────────────────────────────────────────────────────────
