@@ -581,9 +581,9 @@ static void handleCommand(const char* payload) {
 
     if (!doc["deepSleep"].isNull()) {
         s_deepSleepMode = doc["deepSleep"].as<bool>();
+        setDeepSleepMode(s_deepSleepMode);
         logMessage(String("deepSleep -> ") + (s_deepSleepMode ? "on" : "off"), "info");
         needsSave = true;
-        broadcastButtonState(s_maintenanceMode, s_deepSleepMode);
     }
 
     if (needsSave) {
@@ -614,7 +614,7 @@ static void handleCommand(const char* payload) {
             s_maintenanceMode = false;
             logMessage("Maintenance ended — deep sleep cycle resuming", "info");
         }
-        broadcastButtonState(s_maintenanceMode, s_deepSleepMode);
+        setMaintenanceMode(s_maintenanceMode);
     }
 
     if (doc["ota"].is<const char*>()) {
@@ -934,7 +934,7 @@ static void tryDeferredSubscribe() {
 
 void uplinkTask(void* pvParameters) {
     loadMqttConfig(mqttCfgData);
-    { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; }
+    { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; setDeepSleepMode(s_deepSleepMode); }
 
     snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
              (unsigned long)STATE_GET(chipId));
@@ -1108,7 +1108,7 @@ void uplinkTask(void* pvParameters) {
 
 void uplinkInit() {
     loadMqttConfig(mqttCfgData);
-    { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; }
+    { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; setDeepSleepMode(s_deepSleepMode); }
     snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
              (unsigned long)STATE_GET(chipId));
     loadWifiCreds(s_ssid, sizeof(s_ssid), s_pass, sizeof(s_pass),

@@ -8,13 +8,25 @@
 static WebSocketsServer wsServer(81);
 static bool wsStarted = false;
 static bool debugLogEnabled = false;
-//static bool maintenanceModeEnabled = false;
+static bool maintenanceModeEnabled = false;
+static bool deepSleepModeEnabled = false;
 static bool s_wsEnabled = true;
 
 void setDebugLog(bool en) { debugLogEnabled = en; }
 bool getDebugLog()        { return debugLogEnabled; }
-//void setMaintenanceMode(bool en) { maintenanceModeEnabled = en; }
-//bool getMaintenanceMode()        { return maintenanceModeEnabled; }
+
+void setMaintenanceMode(bool en) {
+    maintenanceModeEnabled = en;
+    broadcastButtonState(maintenanceModeEnabled, deepSleepModeEnabled);
+}
+bool getMaintenanceMode() { return maintenanceModeEnabled; }
+
+void setDeepSleepMode(bool en) {
+    deepSleepModeEnabled = en;
+    broadcastButtonState(maintenanceModeEnabled, deepSleepModeEnabled);
+}
+bool getDeepSleepMode() { return deepSleepModeEnabled; }
+
 void loggerSetWsEnabled(bool en) { s_wsEnabled = en; }
 
 void broadcastButtonState(bool maintenance, bool deepSleep) {
