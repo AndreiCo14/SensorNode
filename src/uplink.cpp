@@ -583,6 +583,7 @@ static void handleCommand(const char* payload) {
         s_deepSleepMode = doc["deepSleep"].as<bool>();
         logMessage(String("deepSleep -> ") + (s_deepSleepMode ? "on" : "off"), "info");
         needsSave = true;
+        broadcastButtonState(s_maintenanceMode, s_deepSleepMode);
     }
 
     if (needsSave) {
@@ -613,6 +614,7 @@ static void handleCommand(const char* payload) {
             s_maintenanceMode = false;
             logMessage("Maintenance ended — deep sleep cycle resuming", "info");
         }
+        broadcastButtonState(s_maintenanceMode, s_deepSleepMode);
     }
 
     if (doc["ota"].is<const char*>()) {

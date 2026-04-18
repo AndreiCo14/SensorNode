@@ -17,6 +17,16 @@ void setMaintenanceMode(bool en) { maintenanceModeEnabled = en; }
 bool getMaintenanceMode()        { return maintenanceModeEnabled; }
 void loggerSetWsEnabled(bool en) { s_wsEnabled = en; }
 
+void broadcastButtonState(bool maintenance, bool deepSleep) {
+    if (!wsStarted) return;
+    JsonDocument doc;
+    doc["maintenance"] = maintenance;
+    doc["deepSleep"] = deepSleep;
+    String out;
+    serializeJson(doc, out);
+    wsServer.broadcastTXT(out);
+}
+
 static LogEntry ringBuffer[LOG_RING_SIZE];
 static size_t   ringIndex = 0;
 static SemaphoreHandle_t ringMutex = NULL;
