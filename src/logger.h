@@ -10,6 +10,7 @@ void setMaintenanceMode(bool en);
 bool getMaintenanceMode();
 void loggerSetWsEnabled(bool en);
 void loggerTask(void* pvParameters);
+void broadcastButtonState(bool maintenance, bool deepSleep);
 
 #ifdef ESP8266
 void loggerInit();
