@@ -730,6 +730,12 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties&,
         return;
     }
 
+    // Ignore external MQTT commands if ignoreCmd mode is enabled
+    if (getIgnoreCmdMode()) {
+        logMessage(String("MQTT command ignored [") + topic + "]: ignoreCmd mode active", "info");
+        return;
+    }
+
     MqttCommand cmd;
     size_t copyLen = len < sizeof(cmd.payload) - 1 ? len : sizeof(cmd.payload) - 1;
     memcpy(cmd.payload, payload, copyLen);
