@@ -38,6 +38,7 @@ struct HwConfig {
     int8_t   sampleNum;
     uint16_t onTime;
     bool     deepSleep;
+    bool     ignoreCmd;      // disable MQTT command processing
     // Set to true after a provisioning config has been successfully applied
     bool     provisioned;
 };

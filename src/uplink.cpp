@@ -586,6 +586,17 @@ static void handleCommand(const char* payload) {
         needsSave = true;
     }
 
+    if (!doc["ignoreCmd"].isNull()) {
+        bool ignore = doc["ignoreCmd"].as<bool>();
+        setIgnoreCmdMode(ignore);
+        logMessage(String("ignoreCmd -> ") + (ignore ? "on" : "off"), "info");
+        HwConfig hw;
+        loadHwConfig(hw);
+        hw.ignoreCmd = ignore;
+        saveHwConfig(hw);
+        logMessage("hwconfig saved", "info");
+    }
+
     if (needsSave) {
         HwConfig hw;
         loadHwConfig(hw);
@@ -935,6 +946,7 @@ static void tryDeferredSubscribe() {
 void uplinkTask(void* pvParameters) {
     loadMqttConfig(mqttCfgData);
     { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; setDeepSleepMode(s_deepSleepMode); }
+    { HwConfig hw; loadHwConfig(hw); setIgnoreCmdMode(hw.ignoreCmd); }
 
     snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
              (unsigned long)STATE_GET(chipId));
