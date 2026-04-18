@@ -8,7 +8,7 @@
 #include "system_state.h"
 #include "platform.h"
 #include "queues.h"
-#include "uplink.h"
+//#include "uplink.h"
 #include "index_html.h"
 #include "favicon_ico.h"
 #include <LittleFS.h>
@@ -93,7 +93,7 @@ static void handleGetState() {
     doc["flashKB"]    = ESP.getFlashChipSize() / 1024;
     doc["ipAddress"]  = apMode ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
     doc["debugLog"]   = getDebugLog();
-    doc["maintenance"] = getMaintenanceMode();
+//    doc["maintenance"] = getMaintenanceMode();
 
     sendJsonDoc(200, doc);
 }

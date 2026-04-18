@@ -930,14 +930,14 @@ function connectWs() {
     // Handle button state broadcast from handleCommand
     if (d.hasOwnProperty('maintenance') || d.hasOwnProperty('deepSleep')) {
       if (d.hasOwnProperty('maintenance')) {
-        maintOn = d.maintenance;
+        maintOn = !!d.maintenance;
         var maintBtn = document.getElementById('maint-btn');
         maintBtn.textContent = 'Maintenance Mode: '+(maintOn?'ON':'OFF');
         maintBtn.style.color = maintOn ? '#e65100' : '';
         maintBtn.style.borderColor = maintOn ? '#e65100' : '';
       }
       if (d.hasOwnProperty('deepSleep')) {
-        sleapOn = d.deepSleep;
+        sleapOn = !!d.deepSleep;
         var sleapBtn = document.getElementById('sleap-btn');
         sleapBtn.textContent = 'DeepSleap: '+(sleapOn?'ON':'OFF');
         sleapBtn.style.color = sleapOn ? '#e65100' : '';

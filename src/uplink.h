@@ -2,7 +2,7 @@
 
 void uplinkTask(void* pvParameters);
 void sendTelemetry();
-bool getMaintenanceMode();
+//bool getMaintenanceMode();
 
 #ifdef ESP8266
 void uplinkInit();
