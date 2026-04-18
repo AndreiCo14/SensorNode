@@ -411,7 +411,7 @@ function loadState() {
       sleapOn = !!d.deepSleep;
       document.getElementById('sleap-btn').checked = sleapOn;
       
-      ignCmdOn = !!d.ignMqttCmd;
+      ignCmdOn = !!d.ignoreCmd;
       document.getElementById('ign_cmd-btn').checked = ignCmdOn;
     })
     .catch(function(){set('s-wifi','<span class="err">fetch failed</span>')});
@@ -769,7 +769,7 @@ function toggleDeepSleap() {
 var ignCmdOn = false;
 function toggleIgnCmd() {
   ignCmdOn = !ignCmdOn;
-  postJson('/api/cmd', {ignMqttCmd: ignCmdOn}, 'cmd-msg');
+  postJson('/api/cmd', {ignoreCmd: ignCmdOn}, 'cmd-msg');
 }
 
 // ── Features ───────────────────────────────────────────────────────────────────
@@ -933,7 +933,7 @@ function connectWs() {
       d = {t: d.t, m: 'OTA: ' + pct + '%', l: 'info'};
     }
     // Handle toggle state broadcast from handleCommand
-    if (d.hasOwnProperty('maintenance') || d.hasOwnProperty('deepSleep') || d.hasOwnProperty('debugLog') || d.hasOwnProperty('ignMqttCmd')) {
+    if (d.hasOwnProperty('maintenance') || d.hasOwnProperty('deepSleep') || d.hasOwnProperty('debugLog') || d.hasOwnProperty('ignoreCmd')) {
       if (d.hasOwnProperty('debugLog')) {
         debugOn = !!d.debugLog;
         document.getElementById('debug-btn').checked = debugOn;
@@ -946,8 +946,8 @@ function connectWs() {
         sleapOn = !!d.deepSleep;
         document.getElementById('sleap-btn').checked = sleapOn;
       }
-      if (d.hasOwnProperty('ignMqttCmd')) {
-        ignCmdOn = !!d.ignMqttCmd;
+      if (d.hasOwnProperty('ignoreCmd')) {
+        ignCmdOn = !!d.ignoreCmd;
         document.getElementById('ign_cmd-btn').checked = ignCmdOn;
       }
       return;
