@@ -95,6 +95,7 @@ static void handleGetState() {
     doc["debugLog"]   = getDebugLog();
     doc["maintenance"] = getMaintenanceMode();
     doc["deepSleep"]  = getDeepSleepMode();
+    doc["ignoreCmd"]  = getIgnoreCmdMode();
 
     sendJsonDoc(200, doc);
 }

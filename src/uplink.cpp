@@ -30,6 +30,7 @@ static uint32_t s_connectedAtMs      = 0;       // millis() when CONNACK receive
 static char s_cmdTopic[64]        = {};
 static bool s_deepSleepMode       = false;  // enter sleep after each publish cycle
 static bool s_maintenanceMode     = false;  // inhibit sleep; set by maintenance:true in Start reply
+static bool s_ignoreCmdMode       = false;  // ignore external MQTT commands
 static bool s_sensorsStarted      = false;  // sensors have been enabled this boot
 #define MQTT_CALL(method, ...) \
     do { if (mqttSecure) mqttSecure->method(__VA_ARGS__); \
@@ -586,6 +587,17 @@ static void handleCommand(const char* payload) {
         needsSave = true;
     }
 
+    if (!doc["ignoreCmd"].isNull()) {
+        bool ignore = doc["ignoreCmd"].as<bool>();
+        setIgnoreCmdMode(ignore);
+        logMessage(String("ignoreCmd -> ") + (ignore ? "on" : "off"), "info");
+        HwConfig hw;
+        loadHwConfig(hw);
+        hw.ignoreCmd = ignore;
+        saveHwConfig(hw);
+        logMessage("hwconfig saved", "info");
+    }
+
     if (needsSave) {
         HwConfig hw;
         loadHwConfig(hw);
@@ -716,6 +728,12 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties&,
         s_provisionPayload.concat((const char*)payload, len);
         s_provisionPending = true;
         logMessage("Provision config received", "info");
+        return;
+    }
+
+    // Ignore external MQTT commands if ignoreCmd mode is enabled
+    if (getIgnoreCmdMode()) {
+        logMessage(String("MQTT command ignored [") + topic + "]: ignoreCmd mode active", "info");
         return;
     }
 
@@ -935,6 +953,7 @@ static void tryDeferredSubscribe() {
 void uplinkTask(void* pvParameters) {
     loadMqttConfig(mqttCfgData);
     { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; setDeepSleepMode(s_deepSleepMode); }
+    { HwConfig hw; loadHwConfig(hw); setIgnoreCmdMode(hw.ignoreCmd); }
 
     snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
              (unsigned long)STATE_GET(chipId));

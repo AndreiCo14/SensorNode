@@ -91,6 +91,7 @@ section h2{font-size:11px;color:var(--accent);text-transform:uppercase;letter-sp
 .form-row input[type=number]{width:70px}
 .form-row input[type=text],.form-row input[type=password]{width:180px}
 .form-row input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
+.form-row input[type=checkbox]:checked{accent-color:var(--ok)}
 textarea{width:100%;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:6px;border-radius:2px;min-height:120px;resize:vertical;font-family:monospace;font-size:12px}
 .btn{background:var(--btn-bg);color:var(--btn-text);border:1px solid var(--btn-border);padding:4px 12px;cursor:pointer;border-radius:3px;font-family:inherit;font-size:12px;margin-top:6px}
 .btn:hover{background:var(--btn-hover)}
@@ -274,9 +275,25 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
     <div class="btn-row">
       <button class="btn danger" onclick="sendCmd({cmd:'reboot'})">Reboot</button>
       <button class="btn" onclick="sendCmd({cmd:'telemetry'})">Send Telemetry</button>
-      <button class="btn" id="debug-btn" onclick="toggleDebug()">Debug Log: OFF</button>
-      <button class="btn" id="maint-btn" onclick="toggleMaintenance()">Maintenance Mode: OFF</button>
-      <button class="btn" id="sleap-btn" onclick="toggleDeepSleap()">DeepSleap: OFF</button>
+    </div>
+    <div class="cmd-divider">
+      <div class="sublabel" style="margin-bottom:6px">Toggle Commands</div>
+      <div class="form-row" style="margin-bottom:4px">
+        <input type="checkbox" id="debug-btn" onchange="toggleDebug()">
+        <label for="debug-btn" style="width:auto;cursor:pointer">Debug Log</label>
+      </div>
+      <div class="form-row" style="margin-bottom:4px">
+        <input type="checkbox" id="maint-btn" onchange="toggleMaintenance()">
+        <label for="maint-btn" style="width:auto;cursor:pointer">Maintenance Mode</label>
+      </div>
+      <div class="form-row" style="margin-bottom:4px">
+        <input type="checkbox" id="sleap-btn" onchange="toggleDeepSleap()">
+        <label for="sleap-btn" style="width:auto;cursor:pointer">DeepSleap</label>
+      </div>
+      <div class="form-row" style="margin-bottom:4px">
+        <input type="checkbox" id="ign_cmd-btn" onchange="toggleIgnCmd()">
+        <label for="ign_cmd-btn" style="width:auto;cursor:pointer">Ignore MQTT Commands</label>
+      </div>
     </div>
     <div class="cmd-divider">
       <div class="sublabel" style="margin-bottom:6px">Provision Config</div>
@@ -386,22 +403,16 @@ function loadState() {
         bootEpoch = null;
       }
       debugOn = !!d.debugLog;
-      var btn = document.getElementById('debug-btn');
-      btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');
-      btn.style.color = debugOn ? '#4caf50' : '';
-      btn.style.borderColor = debugOn ? '#4caf50' : '';
+      document.getElementById('debug-btn').checked = debugOn;
       
       maintOn = !!d.maintenance;
-      var maintBtn = document.getElementById('maint-btn');
-      maintBtn.textContent = 'Maintenance Mode: '+(maintOn?'ON':'OFF');
-      maintBtn.style.color = maintOn ? '#e65100' : '';
-      maintBtn.style.borderColor = maintOn ? '#e65100' : '';
+      document.getElementById('maint-btn').checked = maintOn;
       
       sleapOn = !!d.deepSleep;
-      var sleapBtn = document.getElementById('sleap-btn');
-      sleapBtn.textContent = 'DeepSleap: '+(sleapOn?'ON':'OFF');
-      sleapBtn.style.color = sleapOn ? '#e65100' : '';
-      sleapBtn.style.borderColor = sleapOn ? '#e65100' : '';
+      document.getElementById('sleap-btn').checked = sleapOn;
+      
+      ignCmdOn = !!d.ignoreCmd;
+      document.getElementById('ign_cmd-btn').checked = ignCmdOn;
     })
     .catch(function(){set('s-wifi','<span class="err">fetch failed</span>')});
   loadSensorValues();
@@ -741,30 +752,24 @@ var debugOn = false;
 function toggleDebug() {
   debugOn = !debugOn;
   postJson('/api/cmd', {debugLog: debugOn}, 'cmd-msg');
-  var btn = document.getElementById('debug-btn');
-  btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');
-  btn.style.color = debugOn ? '#4caf50' : '';
-  btn.style.borderColor = debugOn ? '#4caf50' : '';
 }
 
 var maintOn = false;
 function toggleMaintenance() {
   maintOn = !maintOn;
   postJson('/api/cmd', {maintenance: maintOn}, 'cmd-msg');
-  var btn = document.getElementById('maint-btn');
-  btn.textContent = 'Maintenance Mode: '+(maintOn?'ON':'OFF');
-  btn.style.color = maintOn ? '#e65100' : '';
-  btn.style.borderColor = maintOn ? '#e65100' : '';
 }
 
 var sleapOn = false;
 function toggleDeepSleap() {
   sleapOn = !sleapOn;
   postJson('/api/cmd', {deepSleep: sleapOn}, 'cmd-msg');
-  var btn = document.getElementById('sleap-btn');
-  btn.textContent = 'DeepSleap: '+(sleapOn?'ON':'OFF');
-  btn.style.color = sleapOn ? '#e65100' : '';
-  btn.style.borderColor = sleapOn ? '#e65100' : '';
+}
+
+var ignCmdOn = false;
+function toggleIgnCmd() {
+  ignCmdOn = !ignCmdOn;
+  postJson('/api/cmd', {ignoreCmd: ignCmdOn}, 'cmd-msg');
 }
 
 // ── Features ───────────────────────────────────────────────────────────────────
@@ -927,21 +932,23 @@ function connectWs() {
       if (pct >= 100) setTimeout(function(){ prog.style.display='none'; }, 2000);
       d = {t: d.t, m: 'OTA: ' + pct + '%', l: 'info'};
     }
-    // Handle button state broadcast from handleCommand
-    if (d.hasOwnProperty('maintenance') || d.hasOwnProperty('deepSleep')) {
+    // Handle toggle state broadcast from handleCommand
+    if (d.hasOwnProperty('maintenance') || d.hasOwnProperty('deepSleep') || d.hasOwnProperty('debugLog') || d.hasOwnProperty('ignoreCmd')) {
+      if (d.hasOwnProperty('debugLog')) {
+        debugOn = !!d.debugLog;
+        document.getElementById('debug-btn').checked = debugOn;
+      }
       if (d.hasOwnProperty('maintenance')) {
         maintOn = !!d.maintenance;
-        var maintBtn = document.getElementById('maint-btn');
-        maintBtn.textContent = 'Maintenance Mode: '+(maintOn?'ON':'OFF');
-        maintBtn.style.color = maintOn ? '#e65100' : '';
-        maintBtn.style.borderColor = maintOn ? '#e65100' : '';
+        document.getElementById('maint-btn').checked = maintOn;
       }
       if (d.hasOwnProperty('deepSleep')) {
         sleapOn = !!d.deepSleep;
-        var sleapBtn = document.getElementById('sleap-btn');
-        sleapBtn.textContent = 'DeepSleap: '+(sleapOn?'ON':'OFF');
-        sleapBtn.style.color = sleapOn ? '#e65100' : '';
-        sleapBtn.style.borderColor = sleapOn ? '#e65100' : '';
+        document.getElementById('sleap-btn').checked = sleapOn;
+      }
+      if (d.hasOwnProperty('ignoreCmd')) {
+        ignCmdOn = !!d.ignoreCmd;
+        document.getElementById('ign_cmd-btn').checked = ignCmdOn;
       }
       return;
     }
