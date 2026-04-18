@@ -30,6 +30,7 @@ static uint32_t s_connectedAtMs      = 0;       // millis() when CONNACK receive
 static char s_cmdTopic[64]        = {};
 static bool s_deepSleepMode       = false;  // enter sleep after each publish cycle
 static bool s_maintenanceMode     = false;  // inhibit sleep; set by maintenance:true in Start reply
+static bool s_ignoreCmdMode       = false;  // ignore external MQTT commands
 static bool s_sensorsStarted      = false;  // sensors have been enabled this boot
 #define MQTT_CALL(method, ...) \
     do { if (mqttSecure) mqttSecure->method(__VA_ARGS__); \
