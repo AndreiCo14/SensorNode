@@ -91,6 +91,7 @@ section h2{font-size:11px;color:var(--accent);text-transform:uppercase;letter-sp
 .form-row input[type=number]{width:70px}
 .form-row input[type=text],.form-row input[type=password]{width:180px}
 .form-row input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
+.form-row input[type=checkbox]:checked{accent-color:var(--ok)}
 textarea{width:100%;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:6px;border-radius:2px;min-height:120px;resize:vertical;font-family:monospace;font-size:12px}
 .btn{background:var(--btn-bg);color:var(--btn-text);border:1px solid var(--btn-border);padding:4px 12px;cursor:pointer;border-radius:3px;font-family:inherit;font-size:12px;margin-top:6px}
 .btn:hover{background:var(--btn-hover)}
@@ -274,7 +275,25 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
     <div class="btn-row">
       <button class="btn danger" onclick="sendCmd({cmd:'reboot'})">Reboot</button>
       <button class="btn" onclick="sendCmd({cmd:'telemetry'})">Send Telemetry</button>
-      <button class="btn" id="debug-btn" onclick="toggleDebug()">Debug Log: OFF</button>
+    </div>
+    <div class="cmd-divider">
+      <div class="sublabel" style="margin-bottom:6px">Toggle Commands</div>
+      <div class="form-row" style="margin-bottom:4px">
+        <input type="checkbox" id="debug-btn" onchange="toggleDebug()">
+        <label for="debug-btn" style="width:auto;cursor:pointer">Debug Log</label>
+      </div>
+      <div class="form-row" style="margin-bottom:4px">
+        <input type="checkbox" id="maint-btn" onchange="toggleMaintenance()">
+        <label for="maint-btn" style="width:auto;cursor:pointer">Maintenance Mode</label>
+      </div>
+      <div class="form-row" style="margin-bottom:4px">
+        <input type="checkbox" id="sleap-btn" onchange="toggleDeepSleap()">
+        <label for="sleap-btn" style="width:auto;cursor:pointer">DeepSleap</label>
+      </div>
+      <div class="form-row" style="margin-bottom:4px">
+        <input type="checkbox" id="ign_cmd-btn" onchange="toggleIgnCmd()">
+        <label for="ign_cmd-btn" style="width:auto;cursor:pointer">Ignore MQTT Commands</label>
+      </div>
     </div>
     <div class="cmd-divider">
       <div class="sublabel" style="margin-bottom:6px">Provision Config</div>
@@ -327,7 +346,10 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
   <!-- Log Stream -->
   <section id="log-section" class="full">
     <h2>Log Stream</h2>
-    <div class="ws-status"><span id="ws-dot">&#9679;</span> <span id="ws-label">disconnected</span></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div class="ws-status" style="margin:0"><span id="ws-dot">&#9679;</span> <span id="ws-label">disconnected</span></div>
+      <button class="btn" onclick="document.getElementById('log').innerHTML=''" style="margin:0;padding:2px 8px;font-size:11px">Clear</button>
+    </div>
     <div id="log"></div>
   </section>
 
@@ -384,10 +406,16 @@ function loadState() {
         bootEpoch = null;
       }
       debugOn = !!d.debugLog;
-      var btn = document.getElementById('debug-btn');
-      btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');
-      btn.style.color = debugOn ? '#4caf50' : '';
-      btn.style.borderColor = debugOn ? '#4caf50' : '';
+      document.getElementById('debug-btn').checked = debugOn;
+      
+      maintOn = !!d.maintenance;
+      document.getElementById('maint-btn').checked = maintOn;
+      
+      sleapOn = !!d.deepSleep;
+      document.getElementById('sleap-btn').checked = sleapOn;
+      
+      ignCmdOn = !!d.ignoreCmd;
+      document.getElementById('ign_cmd-btn').checked = ignCmdOn;
     })
     .catch(function(){set('s-wifi','<span class="err">fetch failed</span>')});
   loadSensorValues();
@@ -727,10 +755,24 @@ var debugOn = false;
 function toggleDebug() {
   debugOn = !debugOn;
   postJson('/api/cmd', {debugLog: debugOn}, 'cmd-msg');
-  var btn = document.getElementById('debug-btn');
-  btn.textContent = 'Debug Log: '+(debugOn?'ON':'OFF');
-  btn.style.color = debugOn ? '#4caf50' : '';
-  btn.style.borderColor = debugOn ? '#4caf50' : '';
+}
+
+var maintOn = false;
+function toggleMaintenance() {
+  maintOn = !maintOn;
+  postJson('/api/cmd', {maintenance: maintOn}, 'cmd-msg');
+}
+
+var sleapOn = false;
+function toggleDeepSleap() {
+  sleapOn = !sleapOn;
+  postJson('/api/cmd', {deepSleep: sleapOn}, 'cmd-msg');
+}
+
+var ignCmdOn = false;
+function toggleIgnCmd() {
+  ignCmdOn = !ignCmdOn;
+  postJson('/api/cmd', {ignoreCmd: ignCmdOn}, 'cmd-msg');
 }
 
 // ── Features ───────────────────────────────────────────────────────────────────
@@ -892,6 +934,26 @@ function connectWs() {
       prog.value = pct;
       if (pct >= 100) setTimeout(function(){ prog.style.display='none'; }, 2000);
       d = {t: d.t, m: 'OTA: ' + pct + '%', l: 'info'};
+    }
+    // Handle toggle state broadcast from handleCommand
+    if (d.hasOwnProperty('maintenance') || d.hasOwnProperty('deepSleep') || d.hasOwnProperty('debugLog') || d.hasOwnProperty('ignoreCmd')) {
+      if (d.hasOwnProperty('debugLog')) {
+        debugOn = !!d.debugLog;
+        document.getElementById('debug-btn').checked = debugOn;
+      }
+      if (d.hasOwnProperty('maintenance')) {
+        maintOn = !!d.maintenance;
+        document.getElementById('maint-btn').checked = maintOn;
+      }
+      if (d.hasOwnProperty('deepSleep')) {
+        sleapOn = !!d.deepSleep;
+        document.getElementById('sleap-btn').checked = sleapOn;
+      }
+      if (d.hasOwnProperty('ignoreCmd')) {
+        ignCmdOn = !!d.ignoreCmd;
+        document.getElementById('ign_cmd-btn').checked = ignCmdOn;
+      }
+      return;
     }
     var log = document.getElementById('log');
     var row = document.createElement('div');

@@ -259,6 +259,7 @@ bool loadHwConfig(HwConfig& cfg) {
     cfg.sampleNum    = DEFAULT_SAMPLE_NUM;
     cfg.onTime       = 30;
     cfg.deepSleep    = false;
+    cfg.ignoreCmd    = false;
 
     JsonDocument doc;
     if (!readJson(HW_CONF_PATH, doc)) return false;
@@ -288,6 +289,7 @@ bool loadHwConfig(HwConfig& cfg) {
         if (cfg.onTime < 30) cfg.onTime = 30;
     }
     cfg.deepSleep   = doc["deepSleep"]   | false;
+    cfg.ignoreCmd   = doc["ignoreCmd"]   | false;
     cfg.provisioned = doc["provisioned"] | false;
     return true;
 }
@@ -312,6 +314,7 @@ bool saveHwConfig(const HwConfig& cfg) {
     doc["sampleNum"]     = cfg.sampleNum;
     doc["onTime"]        = cfg.onTime;
     doc["deepSleep"]     = cfg.deepSleep;
+    doc["ignoreCmd"]     = cfg.ignoreCmd;
     doc["provisioned"]   = cfg.provisioned;
     return writeJson(HW_CONF_PATH, doc);
 }

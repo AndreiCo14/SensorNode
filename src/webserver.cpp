@@ -92,6 +92,9 @@ static void handleGetState() {
     doc["flashKB"]    = ESP.getFlashChipSize() / 1024;
     doc["ipAddress"]  = apMode ? WiFi.softAPIP().toString() : WiFi.localIP().toString();
     doc["debugLog"]   = getDebugLog();
+    doc["maintenance"] = getMaintenanceMode();
+    doc["deepSleep"]  = getDeepSleepMode();
+    doc["ignoreCmd"]  = getIgnoreCmdMode();
 
     sendJsonDoc(200, doc);
 }

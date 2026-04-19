@@ -30,6 +30,7 @@ static uint32_t s_connectedAtMs      = 0;       // millis() when CONNACK receive
 static char s_cmdTopic[64]        = {};
 static bool s_deepSleepMode       = false;  // enter sleep after each publish cycle
 static bool s_maintenanceMode     = false;  // inhibit sleep; set by maintenance:true in Start reply
+static bool s_ignoreCmdMode       = false;  // ignore external MQTT commands
 static bool s_sensorsStarted      = false;  // sensors have been enabled this boot
 #define MQTT_CALL(method, ...) \
     do { if (mqttSecure) mqttSecure->method(__VA_ARGS__); \
@@ -581,7 +582,20 @@ static void handleCommand(const char* payload) {
 
     if (!doc["deepSleep"].isNull()) {
         s_deepSleepMode = doc["deepSleep"].as<bool>();
+        setDeepSleepMode(s_deepSleepMode);
+        logMessage(String("deepSleep -> ") + (s_deepSleepMode ? "on" : "off"), "info");
         needsSave = true;
+    }
+
+    if (!doc["ignoreCmd"].isNull()) {
+        bool ignore = doc["ignoreCmd"].as<bool>();
+        setIgnoreCmdMode(ignore);
+        logMessage(String("ignoreCmd -> ") + (ignore ? "on" : "off"), "info");
+        HwConfig hw;
+        loadHwConfig(hw);
+        hw.ignoreCmd = ignore;
+        saveHwConfig(hw);
+        logMessage("hwconfig saved", "info");
     }
 
     if (needsSave) {
@@ -601,9 +615,6 @@ static void handleCommand(const char* payload) {
         logMessage(String("debugLog -> ") + (en ? "on" : "off"), "info");
     }
 
-    if (!doc["deepSleep"].isNull())
-        logMessage(String("deepSleep -> ") + (s_deepSleepMode ? "on" : "off"), "info");
-
     // maintenance:true  — pause deep sleep cycle, stay online (set in Start reply)
     // maintenance:false — resume deep sleep cycle (sent as subsequent cmd)
     if (!doc["maintenance"].isNull()) {
@@ -615,6 +626,7 @@ static void handleCommand(const char* payload) {
             s_maintenanceMode = false;
             logMessage("Maintenance ended — deep sleep cycle resuming", "info");
         }
+        setMaintenanceMode(s_maintenanceMode);
     }
 
     if (doc["ota"].is<const char*>()) {
@@ -716,6 +728,12 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties&,
         s_provisionPayload.concat((const char*)payload, len);
         s_provisionPending = true;
         logMessage("Provision config received", "info");
+        return;
+    }
+
+    // Ignore external MQTT commands if ignoreCmd mode is enabled
+    if (getIgnoreCmdMode()) {
+        logMessage(String("MQTT command ignored [") + topic + "]: ignoreCmd mode active", "info");
         return;
     }
 
@@ -934,7 +952,8 @@ static void tryDeferredSubscribe() {
 
 void uplinkTask(void* pvParameters) {
     loadMqttConfig(mqttCfgData);
-    { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; }
+    { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; setDeepSleepMode(s_deepSleepMode); }
+    { HwConfig hw; loadHwConfig(hw); setIgnoreCmdMode(hw.ignoreCmd); }
 
     snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
              (unsigned long)STATE_GET(chipId));
@@ -1104,7 +1123,7 @@ void uplinkTask(void* pvParameters) {
 
 void uplinkInit() {
     loadMqttConfig(mqttCfgData);
-    { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; }
+    { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; setDeepSleepMode(s_deepSleepMode); }
     snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
              (unsigned long)STATE_GET(chipId));
     loadWifiCreds(s_ssid, sizeof(s_ssid), s_pass, sizeof(s_pass),

@@ -25,3 +25,4 @@ factory/factory-*.bin
 # Local design/scratch docs
 *-design.md
 docs/*-design.md
+ No newline at end of file
