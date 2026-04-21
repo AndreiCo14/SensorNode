@@ -588,14 +588,10 @@ static void handleCommand(const char* payload) {
     }
 
     if (!doc["ignoreCmd"].isNull()) {
-        bool ignore = doc["ignoreCmd"].as<bool>();
-        setIgnoreCmdMode(ignore);
-        logMessage(String("ignoreCmd -> ") + (ignore ? "on" : "off"), "info");
-        HwConfig hw;
-        loadHwConfig(hw);
-        hw.ignoreCmd = ignore;
-        saveHwConfig(hw);
-        logMessage("hwconfig saved", "info");
+        s_ignoreCmdMode = doc["ignoreCmd"].as<bool>();
+        setIgnoreCmdMode(s_ignoreCmdMode);
+        logMessage(String("ignoreCmd -> ") + (s_ignoreCmdMode ? "on" : "off"), "info");
+        needsSave = true;
     }
 
     if (needsSave) {
@@ -605,6 +601,7 @@ static void handleCommand(const char* payload) {
         hw.sampleNum     = STATE_GET(sampleNum);
         hw.onTime        = STATE_GET(onTime);
         hw.deepSleep     = s_deepSleepMode;
+        hw.ignoreCmd = s_ignoreCmdMode;
         saveHwConfig(hw);
         logMessage("hwconfig saved", "info");
     }
@@ -731,17 +728,18 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties&,
         return;
     }
 
+    MqttCommand cmd;
+    size_t copyLen = len < sizeof(cmd.payload) - 1 ? len : sizeof(cmd.payload) - 1;
+    memcpy(cmd.payload, payload, copyLen);
+    cmd.payload[copyLen] = '\0';
+    logMessage(String("MQTT rx [") + topic + "]: " + cmd.payload, "info");
+
     // Ignore external MQTT commands if ignoreCmd mode is enabled
     if (getIgnoreCmdMode()) {
         logMessage(String("MQTT command ignored [") + topic + "]: ignoreCmd mode active", "info");
         return;
     }
 
-    MqttCommand cmd;
-    size_t copyLen = len < sizeof(cmd.payload) - 1 ? len : sizeof(cmd.payload) - 1;
-    memcpy(cmd.payload, payload, copyLen);
-    cmd.payload[copyLen] = '\0';
-    logMessage(String("MQTT rx [") + topic + "]: " + cmd.payload, "info");
     xQueueSend(cmdQueue, &cmd, 0);
 }
 
