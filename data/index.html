@@ -73,20 +73,20 @@ header svg .fil0{fill:rgba(255,255,255,.92)}
 header svg .fil1{fill:rgba(0,60,100,.55)}
 body.dark header svg .fil0{fill:#7eb8f7}
 body.dark header svg .fil1{fill:#1a1a2e}
-main{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:12px;flex:1}
+main{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;padding:12px;flex:1}
 @media(max-width:640px){main{grid-template-columns:1fr}}
 section{background:var(--bg-card);border:none;border-radius:6px;padding:12px;box-shadow:var(--shadow)}
 section h2{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border-h2)}
 .full{grid-column:1/-1}
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
 .stat{background:var(--bg-stat);border:1px solid var(--border);border-radius:4px;padding:6px 8px}
-.stat .label{color:var(--text-dim);font-size:10px;margin-bottom:2px}
+.stat .label{color:var(--text-dim);font-size:18px;margin-bottom:2px}
 .stat .value{color:var(--text);font-size:13px}
 .ok{color:var(--ok)}
 .err{color:var(--err)}
 .warn{color:var(--warn)}
 .form-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.form-row label{color:var(--text-muted);width:90px;flex-shrink:0;font-size:11px}
+.form-row label{color:var(--text-muted);width:118px;flex-shrink:0;font-size:18px}
 .form-row input[type=number],.form-row input[type=text],.form-row input[type=password]{background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:2px}
 .form-row input[type=number]{width:70px}
 .form-row input[type=text],.form-row input[type=password]{width:180px}
@@ -103,8 +103,8 @@ textarea{width:100%;background:var(--bg-input);border:1px solid var(--border);co
 .pass-toggle:hover{color:var(--pass-toggle-hover)}
 .msg{margin-top:6px;font-size:11px;min-height:14px}
 .ap-banner{margin-bottom:10px;padding:8px;background:var(--ap-banner-bg);border:1px solid var(--warn);border-radius:3px;color:var(--warn)}
-.sublabel{font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em}
-.hint-text{font-size:12px;color:var(--text-dim)}
+.sublabel{font-size:18px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em}
+.hint-text{font-size:14px;color:var(--text-dim)}
 .cmd-divider{margin-top:10px;padding-top:8px;border-top:1px solid var(--cmd-divider)}
 .feat-warn{font-size:11px;color:var(--err);margin:2px 0 6px 90px}
 /* Sensor cards */
@@ -130,14 +130,14 @@ textarea{width:100%;background:var(--bg-input);border:1px solid var(--border);co
 .i2c-addr{background:var(--sc-values-bg);border:1px solid var(--sc-values-border);border-radius:2px;padding:2px 7px;margin-right:4px;color:var(--sc-val-v)}
 /* Log */
 #log{height:240px;overflow-y:auto;background:var(--log-bg);border:1px solid var(--log-border);padding:6px;border-radius:2px;display:flex;flex-direction:column}
-#ota-file{font-size:12px;font-family:monospace;color:var(--text-muted);background:none;border:none;padding:0;flex:1;min-width:0}
+#ota-file{font-size:18px;font-family:monospace;color:var(--text-muted);background:none;border:none;padding:0;flex:1;min-width:0}
 .log-entry{padding:1px 0;white-space:pre-wrap;word-break:break-all;line-height:1.5}
 .log-info{color:var(--log-info)}
 .log-warn{color:var(--log-warn)}
 .log-error{color:var(--log-error)}
 .log-debug{color:var(--log-debug)}
 .log-ts{color:var(--log-ts);font-size:11px;margin-right:6px}
-.ws-status{font-size:10px;color:var(--ws-status);margin-bottom:4px}
+.ws-status{font-size:18px;color:var(--ws-status);margin-bottom:4px}
 .ws-ok{color:var(--ws-ok)}
 .ws-err{color:var(--ws-err)}
 /* Drag */
@@ -304,14 +304,17 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
     </div>
     <div class="cmd-divider">
       <div class="sublabel" style="margin-bottom:6px">Factory Reset</div>
-      <div class="form-row"><label style="color:var(--text-muted);width:auto;margin-right:8px"><input type="checkbox" id="reset-keep-wifi" style="margin-right:4px">Keep WiFi</label><label style="color:var(--text-muted);width:auto"><input type="checkbox" id="reset-keep-mqtt" style="margin-right:4px">Keep MQTT</label></div>
-      <button class="btn danger" onclick="doFactoryReset()" style="margin-top:6px">Factory Reset</button>
+      <div class="form-row">
+        <label style="color:var(--text-muted);width:auto;margin-right:8px"><input type="checkbox" id="reset-keep-wifi" style="margin-right:4px">Keep WiFi</label>
+        <label style="color:var(--text-muted);width:auto"><input type="checkbox" id="reset-keep-mqtt" style="margin-right:4px">Keep MQTT</label>
+        <button class="btn danger" onclick="doFactoryReset()" style="margin-top:6px">Factory Reset</button>
+      </div>
     </div>
     <div class="msg" id="cmd-msg"></div>
   </section>
 
   <!-- Firmware Update -->
-  <section id="ota-section" class="full draggable-section" draggable="true">
+  <section id="ota-section" class="draggable-section" draggable="true">
     <h2>Firmware Update</h2>
     <div style="display:flex;align-items:center;gap:8px">
       <input type="file" id="ota-file" accept=".bin">
@@ -1004,8 +1007,8 @@ setInterval(loadState, 15000);
 
 // ── Section resize ─────────────────────────────────────────────────────────────
 (function(){
-  function getSpan(el){return parseInt(el.getAttribute('data-span')||(el.classList.contains('full')?'3':'1'));}
-  function setSpan(el,n){n=Math.max(1,Math.min(3,n));el.setAttribute('data-span',n);el.style.gridColumn=n>1?'span '+n:'';if(n===3)el.classList.add('full');else el.classList.remove('full');}
+  function getSpan(el){return parseInt(el.getAttribute('data-span')||(el.classList.contains('full')?'4':'1'));}
+  function setSpan(el,n){n=Math.max(1,Math.min(4,n));el.setAttribute('data-span',n);el.style.gridColumn=n>1?'span '+n:'';if(n===4)el.classList.add('full');else el.classList.remove('full');}
   function saveSpans(){var s={};document.querySelectorAll('.draggable-section').forEach(function(x){if(x.id)s[x.id]=getSpan(x);});localStorage.setItem('sSpans',JSON.stringify(s));}
   document.querySelectorAll('.draggable-section').forEach(function(el){
     setSpan(el,getSpan(el));
