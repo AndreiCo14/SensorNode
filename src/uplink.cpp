@@ -564,7 +564,11 @@ static void handleCommand(const char* payload) {
     bool needsSave = false;
 
     if (!doc["teleIntervalM"].isNull()) {
-        STATE_SET(teleIntervalM, (uint16_t)doc["teleIntervalM"]);
+        uint16_t v = doc["teleIntervalM"];
+        STATE_SET(teleIntervalM, v);
+//        STATE_SET(teleIntervalM, (uint16_t)doc["teleIntervalM"]);
+        broadcastTeleInterval(v);
+        logMessage(String("teleIntervalM -> ") + String(v), "info");
         needsSave = true;
     }
 

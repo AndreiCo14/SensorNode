@@ -47,6 +47,15 @@ void broadcastButtonState(bool maintenance, bool deepSleep, bool ignoreCmd) {
     wsServer.broadcastTXT(out);
 }
 
+void broadcastTeleInterval(uint16_t teleIntervalM) {
+    if (!wsStarted) return;
+    JsonDocument doc;
+    doc["teleIntervalM"] = teleIntervalM;
+    String out;
+    serializeJson(doc, out);
+    wsServer.broadcastTXT(out);
+}
+
 static LogEntry ringBuffer[LOG_RING_SIZE];
 static size_t   ringIndex = 0;
 static SemaphoreHandle_t ringMutex = NULL;
