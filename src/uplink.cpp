@@ -737,9 +737,10 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties&,
     cmd.payload[copyLen] = '\0';
     logMessage(String("MQTT rx [") + topic + "]: " + cmd.payload, "info");
 
-    // Ignore external MQTT commands if ignoreCmd mode is enabled
-    if (getIgnoreCmdMode()) {
-        logMessage(String("MQTT command ignored [") + topic + "]: ignoreCmd mode active", "info");
+    // Ignore external MQTT commands if ignoreCmd mode is enabled or system is not ready yet
+    if (getIgnoreCmdMode() || !isSystemReady()) {
+        logMessage(String("MQTT command ignored [") + topic + "]: " + 
+                   (!isSystemReady() ? "system not ready" : "ignoreCmd mode active"), "info");
         return;
     }
 
