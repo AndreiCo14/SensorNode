@@ -14,7 +14,9 @@ void setIgnoreCmdMode(bool en);
 bool getIgnoreCmdMode();
 void loggerSetWsEnabled(bool en);
 void loggerTask(void* pvParameters);
-void broadcastButtonState(bool maintenance, bool deepSleep, bool ignoreCmd);
+void broadcast_maintenance(bool maintenance);
+void broadcast_deepSleep(bool deepSleep);
+void broadcast_ignoreCmd(bool ignoreCmd);
 void broadcastTeleInterval(uint16_t teleIntervalM);
 
 #ifdef ESP8266

@@ -117,9 +117,9 @@ void setup() {
         sysState.teleIntervalM = hw.teleIntervalM;
         sysState.sampleNum     = hw.sampleNum;
         sysState.onTime        = hw.onTime;
-        STATE_UNLOCK();
         // Restore ignoreCmd mode before web server starts
         setIgnoreCmdMode(hw.ignoreCmd);
+        STATE_UNLOCK();
     }
 
     // ── Init sensors ──

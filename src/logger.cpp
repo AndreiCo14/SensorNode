@@ -16,31 +16,35 @@ static bool s_wsEnabled = true;
 void setDebugLog(bool en) { debugLogEnabled = en; }
 bool getDebugLog()        { return debugLogEnabled; }
 
-void setMaintenanceMode(bool en) {
-    maintenanceModeEnabled = en;
-    broadcastButtonState(maintenanceModeEnabled, deepSleepModeEnabled, ignoreCmdModeEnabled);
-}
+void setMaintenanceMode(bool en) {maintenanceModeEnabled = en; broadcast_maintenance(en);}
+void setDeepSleepMode(bool en)   {deepSleepModeEnabled = en;   broadcast_deepSleep(en);}
+void setIgnoreCmdMode(bool en)   {ignoreCmdModeEnabled = en;   broadcast_ignoreCmd(en);}
+
 bool getMaintenanceMode() { return maintenanceModeEnabled; }
-
-void setDeepSleepMode(bool en) {
-    deepSleepModeEnabled = en;
-    broadcastButtonState(maintenanceModeEnabled, deepSleepModeEnabled, ignoreCmdModeEnabled);
-}
 bool getDeepSleepMode() { return deepSleepModeEnabled; }
-
-void setIgnoreCmdMode(bool en) {
-    ignoreCmdModeEnabled = en;
-    broadcastButtonState(maintenanceModeEnabled, deepSleepModeEnabled, ignoreCmdModeEnabled);
-}
 bool getIgnoreCmdMode() { return ignoreCmdModeEnabled; }
 
 void loggerSetWsEnabled(bool en) { s_wsEnabled = en; }
 
-void broadcastButtonState(bool maintenance, bool deepSleep, bool ignoreCmd) {
+void broadcast_maintenance(bool maintenance) {
     if (!wsStarted) return;
     JsonDocument doc;
     doc["maintenance"] = maintenance;
+    String out;
+    serializeJson(doc, out);
+    wsServer.broadcastTXT(out);
+}
+void broadcast_deepSleep(bool deepSleep) {
+    if (!wsStarted) return;
+    JsonDocument doc;
     doc["deepSleep"] = deepSleep;
+    String out;
+    serializeJson(doc, out);
+    wsServer.broadcastTXT(out);
+}
+void broadcast_ignoreCmd( bool ignoreCmd) {
+    if (!wsStarted) return;
+    JsonDocument doc;
     doc["ignoreCmd"] = ignoreCmd;
     String out;
     serializeJson(doc, out);
