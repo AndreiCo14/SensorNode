@@ -432,9 +432,7 @@ function loadState() {
       ignCmdOn = !!d.ignoreCmd;
       document.getElementById('ign_cmd-btn').checked = ignCmdOn;
 
-      if (d.teleIntervalM !== undefined) {
-        document.getElementById('tele-interval-select').value = String(d.teleIntervalM);
-      }
+      document.getElementById('tele-interval-select').value = String(d.teleInterval);
     })
     .catch(function(){set('s-wifi','<span class="err">fetch failed</span>')});
   loadSensorValues();
