@@ -955,7 +955,6 @@ static void tryDeferredSubscribe() {
 void uplinkTask(void* pvParameters) {
     loadMqttConfig(mqttCfgData);
     { HwConfig hw; loadHwConfig(hw); s_deepSleepMode = hw.deepSleep; setDeepSleepMode(s_deepSleepMode); }
-    { HwConfig hw; loadHwConfig(hw); setIgnoreCmdMode(hw.ignoreCmd); }
 
     snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
              (unsigned long)STATE_GET(chipId));
