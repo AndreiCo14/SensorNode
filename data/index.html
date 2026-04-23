@@ -234,7 +234,7 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
     <div class="form-row"><label>Broker</label><input type="text" id="mqtt-broker" placeholder="hostname or IP" style="width:200px"></div>
     <div class="form-row"><label>Port</label><input type="number" id="mqtt-port" min="1" max="65535"></div>
     <div class="form-row"><label>Topic Prefix</label><input type="text" id="mqtt-prefix" placeholder="Sensors/" style="width:140px"></div>
-    <div class="form-row"><label>TLS / MQTTS</label><input type="checkbox" id="mqtt-tls"></div>
+    <div class="form-row" id="mqtt-tls-row"><label>TLS / MQTTS</label><input type="checkbox" id="mqtt-tls"></div>
     <button class="btn" onclick="saveMqttConfig()">Save</button>
     <div class="msg" id="mqtt-msg"></div>
   </section>
@@ -277,7 +277,6 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
       <button class="btn" onclick="sendCmd({cmd:'telemetry'})">Send Telemetry</button>
     </div>
     <div class="cmd-divider">
-      <div class="sublabel" style="margin-bottom:6px">Toggle Commands</div>
       <div class="form-row" style="margin-bottom:4px">
         <input type="checkbox" id="debug-btn" onchange="toggleDebug()">
         <label for="debug-btn" style="width:auto;cursor:pointer">Debug Log</label>
@@ -288,7 +287,7 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
       </div>
       <div class="form-row" style="margin-bottom:4px">
         <input type="checkbox" id="sleap-btn" onchange="toggleDeepSleap()">
-        <label for="sleap-btn" style="width:auto;cursor:pointer">DeepSleap</label>
+        <label for="sleap-btn" style="width:auto;cursor:pointer">Deep Sleep</label>
       </div>
       <div class="form-row" style="margin-bottom:4px">
         <input type="checkbox" id="ign_cmd-btn" onchange="toggleIgnCmd()">
@@ -511,8 +510,9 @@ function getPassVal(id) {
 }
 
 function saveWifi() {
-  var ssid = document.getElementById('wifi-ssid').value.trim();
-  if (!ssid) { showMsg('wifi-msg','SSID required',false); return; }
+  var ssid  = document.getElementById('wifi-ssid').value.trim();
+  var ssid2 = document.getElementById('wifi-ssid2').value.trim();
+  if (!ssid && !ssid2) { showMsg('wifi-msg','Enter at least one SSID',false); return; }
   fetch('/api/wifi', {method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ssid:ssid, pass:getPassVal('wifi-pass'),
       ssid2:document.getElementById('wifi-ssid2').value.trim(),
@@ -530,6 +530,7 @@ function loadMqttConfig() {
     document.getElementById('mqtt-port').value   = d.port   || 8883;
     document.getElementById('mqtt-prefix').value = d.prefix || 'Sensors/';
     document.getElementById('mqtt-tls').checked  = !!d.tls;
+    if (d.tls_supported === false) document.getElementById('mqtt-tls-row').style.display = 'none';
   }).catch(function(){});
 }
 
@@ -704,7 +705,8 @@ function saveSensorSetup() {
       return;
     }
     var cb  = document.querySelector('input[type=checkbox][data-type="'+st.type+'"]');
-    var obj = {type: st.type, enabled: cb ? cb.checked : false};
+    if (!cb || !cb.checked) return;  // only send enabled sensors
+    var obj = {type: st.type, enabled: true};
     st.fields.forEach(function(f){
       var el = document.querySelector('[data-type="'+st.type+'"][data-key="'+f.key+'"]');
       if (!el) return;
