@@ -12,8 +12,6 @@ void setDeepSleepMode(bool en);
 bool getDeepSleepMode();
 void setIgnoreCmdMode(bool en);
 bool getIgnoreCmdMode();
-void setSystemReady(bool en);
-bool isSystemReady();
 void loggerSetWsEnabled(bool en);
 void loggerTask(void* pvParameters);
 void broadcast_maintenance(bool maintenance);

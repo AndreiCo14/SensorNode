@@ -119,6 +119,7 @@ void setup() {
         sysState.onTime        = hw.onTime;
         // Restore ignoreCmd mode before web server starts
         setIgnoreCmdMode(hw.ignoreCmd);
+        setDeepSleepMode(hw.deepSleep);
         STATE_UNLOCK();
     }
 
@@ -138,7 +139,6 @@ void setup() {
     loggerInit();
     webInit();
     uplinkInit();  // opens AP + starts STA attempt
-    setSystemReady(true);  // all init complete — MQTT commands can now be processed
     logMessage("Ready — " FW_BUILD, "info");
 #else
     CREATE_TASK_CORE(loggerTask, "logger", TASK_STACK_LOGGER,
@@ -154,7 +154,6 @@ void setup() {
     CREATE_TASK_CORE(webTask, "web", TASK_STACK_WEB,
                      NULL, TASK_PRIO_WEB, &webTaskHandle, 1);
 
-    setSystemReady(true);  // all tasks started — MQTT commands can now be processed
     logMessage("All tasks started — " FW_BUILD, "info");
 #endif
 }

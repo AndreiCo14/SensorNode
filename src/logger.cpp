@@ -12,7 +12,6 @@ static bool maintenanceModeEnabled = false;
 static bool deepSleepModeEnabled = false;
 static bool ignoreCmdModeEnabled = false;
 static bool s_wsEnabled = true;
-static bool s_systemReady = false;  // guards against early MQTT commands before setup() completes
 
 void setDebugLog(bool en) { debugLogEnabled = en; }
 bool getDebugLog()        { return debugLogEnabled; }
@@ -20,12 +19,10 @@ bool getDebugLog()        { return debugLogEnabled; }
 void setMaintenanceMode(bool en) {maintenanceModeEnabled = en;   broadcast_maintenance(en);}
 void setDeepSleepMode(bool en)   {deepSleepModeEnabled = en;     broadcast_deepSleep(en);}
 void setIgnoreCmdMode(bool en)   {ignoreCmdModeEnabled = en;     broadcast_ignoreCmd(en);}
-void setSystemReady(bool en)     {s_systemReady = en;}
 
 bool getMaintenanceMode() { return maintenanceModeEnabled; }
 bool getDeepSleepMode() { return deepSleepModeEnabled; }
 bool getIgnoreCmdMode() { return ignoreCmdModeEnabled; }
-bool isSystemReady()    { return s_systemReady; }
 
 void loggerSetWsEnabled(bool en) { s_wsEnabled = en; }
 

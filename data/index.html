@@ -794,6 +794,7 @@ function toggleIgnCmd() {
 
 function setTeleInterval() {
   var val = parseInt(document.getElementById('tele-interval-select').value, 10);
+  document.getElementById('s-tele').textContent = val + ' min'; //Одновременно меняем значение s-tele
   postJson('/api/cmd', {teleIntervalM: val}, 'cmd-msg');
 }
 
@@ -976,7 +977,9 @@ function connectWs() {
         document.getElementById('ign_cmd-btn').checked = ignCmdOn;
       }
       if (d.hasOwnProperty('teleIntervalM')) {
-        document.getElementById('tele-interval-select').value = String(d.teleIntervalM);
+        var val = String(d.teleIntervalM);
+        document.getElementById('tele-interval-select').value = val;
+        document.getElementById('s-tele').textContent = val + ' min';
       }
       return;
     }
