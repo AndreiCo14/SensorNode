@@ -60,6 +60,15 @@ void broadcastTeleInterval(uint16_t teleIntervalM) {
     wsServer.broadcastTXT(out);
 }
 
+void broadcastOnTime(uint16_t onTimeSec) {
+    if (!wsStarted) return;
+    JsonDocument doc;
+    doc["onTime"] = onTimeSec;
+    String out;
+    serializeJson(doc, out);
+    wsServer.broadcastTXT(out);
+}
+
 static LogEntry ringBuffer[LOG_RING_SIZE];
 static size_t   ringIndex = 0;
 static SemaphoreHandle_t ringMutex = NULL;

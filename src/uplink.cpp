@@ -439,6 +439,7 @@ static void handleProvisioningConfig(const char* payload) {
         hw.onTime = doc["onTime"].as<uint16_t>();
         if (hw.onTime < 30) hw.onTime = 30;
         STATE_SET(onTime, hw.onTime);
+        broadcastOnTime(hw.onTime);
         hwChanged = true;
     }
     if (!doc["interval"].isNull()) { hw.intervalSec = doc["interval"].as<uint16_t>(); hwChanged = true; }
@@ -577,6 +578,8 @@ static void handleCommand(const char* payload) {
         uint16_t v = doc["onTime"];
         if (v < 30) v = 30;
         STATE_SET(onTime, v);
+        logMessage(String("onTime -> ") + v, "info");
+        broadcastOnTime(v);
         needsSave = true;
     }
 

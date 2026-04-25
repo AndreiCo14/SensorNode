@@ -121,6 +121,7 @@ void setup() {
         setIgnoreCmdMode(hw.ignoreCmd);
         setDeepSleepMode(hw.deepSleep);
         STATE_UNLOCK();
+        broadcastOnTime(hw.onTime);
     }
 
     // ── Init sensors ──

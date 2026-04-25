@@ -18,6 +18,7 @@ void broadcast_maintenance(bool maintenance);
 void broadcast_deepSleep(bool deepSleep);
 void broadcast_ignoreCmd(bool ignoreCmd);
 void broadcastTeleInterval(uint16_t teleIntervalM);
+void broadcastOnTime(uint16_t onTimeSec);
 
 #ifdef ESP8266
 void loggerInit();
