@@ -97,6 +97,11 @@ static void handleGetState() {
     doc["deepSleep"]  = getDeepSleepMode();
     doc["ignoreCmd"]  = getIgnoreCmdMode();
     doc["onTime"]     = sysState.onTime;
+#ifdef ESP8266
+    doc["vcc"]        = ESP.getVcc() / 1000.0f;
+#else
+    doc["vcc"]        = 0.0f;
+#endif
 
     sendJsonDoc(200, doc);
 }
