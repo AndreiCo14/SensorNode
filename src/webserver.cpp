@@ -96,6 +96,7 @@ static void handleGetState() {
     doc["maintenance"] = getMaintenanceMode();
     doc["deepSleep"]  = getDeepSleepMode();
     doc["ignoreCmd"]  = getIgnoreCmdMode();
+    doc["onTime"]     = sysState.onTime;
 
     sendJsonDoc(200, doc);
 }

@@ -441,7 +441,8 @@ function loadState() {
       ignCmdOn = !!d.ignoreCmd;
       document.getElementById('ign_cmd-btn').checked = ignCmdOn;
 
-      document.getElementById('tele-interval-select').value = String(d.teleInterval);
+      if (d.teleInterval !== undefined) document.getElementById('tele-interval-select').value = String(d.teleInterval);
+      if (d.onTime !== undefined)       document.getElementById('on-time-select').value = String(d.onTime);
     })
     .catch(function(){set('s-wifi','<span class="err">fetch failed</span>')});
   loadSensorValues();
