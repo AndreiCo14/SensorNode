@@ -309,65 +309,44 @@ static void tickAllSensors(uint32_t nextReadMs) {
         if (sensors[i]) sensors[i]->tick(nextReadMs);
 }
 
+static void processSensorCycle() {
+    if (s_enabled) {
+        uint32_t elapsed = millis() - s_lastRead;
+        uint16_t intervalM = STATE_GET(teleIntervalM);
+        if (intervalM == 0) intervalM = 1;
+        uint32_t intervalMs = (uint32_t)intervalM * 60000UL;
+        tickAllSensors(s_lastRead + intervalMs);
+        if (!s_windowOn) {
+            uint32_t onTimeMs = STATE_GET(onTime) * 1000UL;
+            uint32_t powerOnAt = intervalMs > onTimeMs ? intervalMs - onTimeMs : 0;
+            if (elapsed >= powerOnAt) {
+                if (hwCfg.pin5v >= 0) {
+                    digitalWrite(hwCfg.pin5v, HIGH);
+                    reinitSwitchedSensors();
+                }
+                gpiosOn();
+                s_windowOn = true;
+            }
+        }
+        if (elapsed >= intervalMs) {
+            doSensorRead();
+            if (hwCfg.pin5v >= 0) digitalWrite(hwCfg.pin5v, LOW);
+            gpiosOff();
+            s_windowOn = false;
+        }
+    }
+}
+
 void sensorTask(void* pvParameters) {
     for (;;) {
         ledUpdate();
-        if (s_enabled) {
-            uint32_t now = millis();
-            uint16_t intervalM = STATE_GET(teleIntervalM);
-            if (intervalM == 0) intervalM = 1;
-            uint32_t intervalMs = (uint32_t)intervalM * 60000UL;
-            uint32_t elapsed = now - s_lastRead;
-            tickAllSensors(s_lastRead + intervalMs);
-            if (!s_windowOn) {
-                uint32_t onTimeSec = STATE_GET(onTime);
-                uint32_t powerOnAt = intervalMs > onTimeSec * 1000UL ? intervalMs - onTimeSec * 1000UL : 0;
-                if (elapsed >= powerOnAt) {
-                    if (hwCfg.pin5v >= 0) {
-                        digitalWrite(hwCfg.pin5v, HIGH);
-                        reinitSwitchedSensors();
-                    }
-                    gpiosOn();
-                    s_windowOn = true;
-                }
-            }
-            if (elapsed >= intervalMs) {
-                doSensorRead();
-                if (hwCfg.pin5v >= 0) digitalWrite(hwCfg.pin5v, LOW);
-                gpiosOff();
-                s_windowOn = false;
-            }
-        }
+        processSensorCycle();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
 #ifdef ESP8266
 void sensorProcess() {
-    if (!s_enabled) return;
-    uint32_t now = millis();
-    uint16_t intervalM = STATE_GET(teleIntervalM);
-    if (intervalM == 0) intervalM = 1;
-    uint32_t intervalMs = (uint32_t)intervalM * 60000UL;
-    uint32_t elapsed = now - s_lastRead;
-    tickAllSensors(s_lastRead + intervalMs);
-    if (!s_windowOn) {
-        uint32_t onTimeSec = STATE_GET(onTime);
-        uint32_t powerOnAt = intervalMs > onTimeSec * 1000UL ? intervalMs - onTimeSec * 1000UL : 0;
-        if (elapsed >= powerOnAt) {
-            if (hwCfg.pin5v >= 0) {
-                digitalWrite(hwCfg.pin5v, HIGH);
-                reinitSwitchedSensors();
-            }
-            gpiosOn();
-            s_windowOn = true;
-        }
-    }
-    if (elapsed >= intervalMs) {
-        doSensorRead();
-        if (hwCfg.pin5v >= 0) digitalWrite(hwCfg.pin5v, LOW);
-        gpiosOff();
-        s_windowOn = false;
-    }
+    processSensorCycle();
 }
 #endif
