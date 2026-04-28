@@ -4,6 +4,8 @@
 #include "system_state.h"
 #include <ArduinoJson.h>
 #include <WebSocketsServer.h>
+#include <cstdarg>
+#include <cstdio>
 
 static WebSocketsServer wsServer(81);
 static bool wsStarted = false;
@@ -88,8 +90,26 @@ void logMessage(const char* message, const char* level) {
     Serial.printf("[%s] %s\r\n", level, message);
 }
 
-void logMessage(const String& message, const char* level) {
-    logMessage(message.c_str(), level);
+void logMessageFmt(const char* level, const char* format, ...) {
+    char buffer[128];
+    
+    va_list args;
+    va_start(args, format);
+    int needed = vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    if (needed >= sizeof(buffer)) {
+        if (sizeof(buffer) > 4) {
+            buffer[sizeof(buffer) - 4] = '.';
+            buffer[sizeof(buffer) - 3] = '.';
+            buffer[sizeof(buffer) - 2] = '.';
+            buffer[sizeof(buffer) - 1] = '\0';
+        }
+    } else if (needed < 0) {
+        return;
+    }
+
+    logMessage(buffer, level);
 }
 
 static String serializeEntry(const LogEntry& entry) {

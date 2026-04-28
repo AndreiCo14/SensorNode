@@ -18,7 +18,7 @@ bool Bme280Sensor::begin(int i2c_sda, int i2c_scl, int, int, int) {
         return false;
     }
     _ready = true;
-    logMessage("BME280 OK (0x" + String(_addr, HEX) + ")", "info");
+    logMessageFmt("info", "BME280 OK (0x0x%X)", _addr);
     return true;
 }
 

@@ -17,7 +17,7 @@ static void GEIGER_ISR_ATTR geigerISR() {
 bool GeigerSensor::begin(int, int, int, int, int) {
     _ready = false;
     if (_pin < 0) {
-        logMessage("Geiger: GPIO pin not configured", "warn");
+        logMessageFmt("warn", "Geiger: GPIO pin not configured");
         return false;
     }
     s_pulseCount = 0;
@@ -25,7 +25,7 @@ bool GeigerSensor::begin(int, int, int, int, int) {
     attachInterrupt(digitalPinToInterrupt(_pin), geigerISR, FALLING);
     _lastReadMs = millis();
     _ready = true;
-    logMessage("Geiger counter on GPIO" + String(_pin), "info");
+    logMessageFmt("info", "Geiger counter on GPIO%d", _pin);
     return true;
 }
 

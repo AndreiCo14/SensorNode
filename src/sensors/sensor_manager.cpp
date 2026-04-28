@@ -72,7 +72,7 @@ void sensorsInit() {
     activeCount = 0;
 
     if (!xSemaphoreTake(sensorSetupMutex, pdMS_TO_TICKS(1000))) {
-        logMessage("sensorsInit: mutex timeout", "error");
+        logMessageFmt("error", "sensorsInit: mutex timeout");
         return;
     }
 
@@ -86,7 +86,7 @@ void sensorsInit() {
 
         SensorBase* s = makeSensor(type);
         if (!s) {
-            logMessage(String("Unknown sensor type: ") + type, "warn");
+            logMessageFmt("warn", "Unknown sensor type: %s", type);
             continue;
         }
 
@@ -148,9 +148,9 @@ void sensorsInit() {
     if (sgp4x) {
         if (thSrc) {
             sgp4x->setCompensationSource(thSrc);
-            logMessage(String("SGP4x: compensation from ") + thSrc->type(), "info");
+            logMessageFmt("info", "SGP4x: compensation from %s", thSrc->type());
         } else {
-            logMessage("SGP4x: no T/H source — using default compensation (25°C, 50%RH)", "info");
+            logMessageFmt("info", "SGP4x: no T/H source — using default compensation (25°C, 50%RH)");
         }
     }
 
@@ -196,7 +196,7 @@ void sensorsEnable() {
     if (intervalMs == 0) intervalMs = 60000UL;
     uint32_t readDelayMs = (uint32_t)onTimeSec * 1000UL;
     s_lastRead = millis() - intervalMs + readDelayMs;
-    logMessage("Sensors enabled — first read in " + String(onTimeSec) + "s", "info");
+    logMessageFmt("info", "Sensors enabled — first read in %ss", onTimeSec);
 }
 
 void sensorsEnableDeepSleep() {
@@ -210,7 +210,7 @@ void sensorsEnableDeepSleep() {
     if (intervalMs == 0) intervalMs = 60000UL;
     uint32_t readDelayMs = ((uint32_t)onTimeSec + 5UL) * 1000UL;
     s_lastRead = millis() - intervalMs + readDelayMs;
-    logMessage("Sensors enabled (deep sleep — read in " + String(onTimeSec + 5) + "s)", "info");
+    logMessageFmt("info", "Sensors enabled (deep sleep — read in %ss)", onTimeSec + 5);
 }
 
 void sensorsReinit() {
@@ -301,7 +301,7 @@ static void doSensorRead() {
     strncpy(combined.data, merged, sizeof(combined.data) - 1);
 
     if (xQueueSend(sensorQueue, &combined, pdMS_TO_TICKS(100)) != pdTRUE)
-        logMessage("sensorQueue full — dropping reading", "warn");
+        logMessageFmt("warn", "sensorQueue full — dropping reading");
 }
 
 static void tickAllSensors(uint32_t nextReadMs) {
