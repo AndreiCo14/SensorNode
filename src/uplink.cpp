@@ -1020,7 +1020,6 @@ void uplinkTask(void* pvParameters) {
                 }
             }
         }
-
         if (s_provisionPending) {
             s_provisionPending = false;
             handleProvisioningConfig(s_provisionPayload.c_str());
