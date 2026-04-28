@@ -9,7 +9,7 @@ bool Htu21dSensor::begin(int, int, int, int, int) {
     _ready = false;
     htu21d.begin();
     _ready = true;
-    logMessage("HTU21D OK (0x40)", "info");
+    logMessageFmt("info", "HTU21D OK (0x40)");
     return true;
 }
 
@@ -23,7 +23,7 @@ bool Htu21dSensor::read(SensorReading& r) {
 
     if (temp == ERROR_I2C_TIMEOUT || hum == ERROR_I2C_TIMEOUT ||
         temp == ERROR_BAD_CRC     || hum == ERROR_BAD_CRC) {
-        logMessage("HTU21D read error", "warn");
+        logMessageFmt("warn", "HTU21D read error");
         return false;
     }
 

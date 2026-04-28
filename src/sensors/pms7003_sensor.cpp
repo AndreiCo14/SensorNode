@@ -95,7 +95,7 @@ void Pms7003Sensor::tick(uint32_t nextReadMs) {
                 _pm10 = (float)s10 / _rbCount;
                 _state = State::DATA_READY;
             } else {
-                logMessage("PMS7003: no frames after warmup", "warn");
+                logMessageFmt("warn", "PMS7003: no frames after warmup");
                 _state = State::IDLE;
             }
         }

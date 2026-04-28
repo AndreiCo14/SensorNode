@@ -12,7 +12,7 @@ bool Bmp580Sensor::begin(int, int, int, int, int) {
         return false;
     }
     _ready = true;
-    logMessage("BMP580 OK (0x" + String(_addr, HEX) + ")", "info");
+    logMessageFmt("info", "BMP580 OK (0x0x%X)", _addr);
     return true;
 }
 
@@ -23,7 +23,7 @@ bool Bmp580Sensor::read(SensorReading& r) {
 
     bmp5_sensor_data data = {0, 0};
     if (bmp581.getSensorData(&data) != BMP5_OK) {
-        logMessage("BMP580 read failed", "warn");
+        logMessageFmt("warn", "BMP580 read failed");
         return false;
     }
 

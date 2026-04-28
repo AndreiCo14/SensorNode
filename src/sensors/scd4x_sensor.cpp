@@ -15,11 +15,11 @@ bool Scd4xSensor::begin(int, int, int, int, int) {
 
     uint16_t err = scd4x.startPeriodicMeasurement();
     if (err) {
-        logMessage("SCD4x: startPeriodicMeasurement error " + String(err), "warn");
+        logMessageFmt("warn", "SCD4x: startPeriodicMeasurement error %d", err);
         return false;
     }
     _ready = true;
-    logMessage("SCD4x OK (0x62)", "info");
+    logMessageFmt("info", "SCD4x OK (0x62)");
     return true;
 }
 
@@ -36,7 +36,7 @@ bool Scd4xSensor::read(SensorReading& r) {
     float    temp = 0.0f, hum = 0.0f;
     err = scd4x.readMeasurement(co2, temp, hum);
     if (err) {
-        logMessage("SCD4x read error " + String(err), "warn");
+        logMessageFmt("warn", "SCD4x read error %d", err);
         return false;
     }
 
