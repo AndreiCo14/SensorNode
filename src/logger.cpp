@@ -69,9 +69,10 @@ void broadcastOnTime(uint16_t onTimeSec) {
     wsServer.broadcastTXT(out);
 }
 
-void broadcastFsList(String& json) {
+void broadcastFsList(const String& json) {
     if (!wsStarted) return;
-    wsServer.broadcastTXT(json);
+    String payload = json;  // Create a mutable copy for the library
+    wsServer.broadcastTXT(payload);
 }
 
 void broadcastFsContent(const String& content) {

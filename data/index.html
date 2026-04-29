@@ -941,13 +941,6 @@ function listFiles() {
   var el = document.getElementById('fs-result');
   el.textContent = 'Loading...';
   fetch('/api/fs')
-    .then(function(r){return r.json()})
-    .then(function(d){
-      if (!d.mounted) { el.textContent = 'File system not mounted'; return; }
-      var files = d.files || [];
-      if (!files.length) { el.textContent = 'No files found'; return; }
-      el.textContent = files.map(function(f){ return f.name + ' (' + f.size + ' bytes)'; }).join('\n');
-    })
     .catch(function(){el.textContent='Failed to list files';});
 }
 
@@ -957,13 +950,6 @@ function readFile() {
   if (!name) { el.textContent = 'Enter a filename'; return; }
   el.textContent = 'Reading...';
   fetch('/api/fs?file=' + encodeURIComponent(name))
-    .then(function(r){
-      if (!r.ok) throw new Error('File not found or read error');
-      return r.text();
-    })
-    .then(function(text){
-      el.textContent = text;
-    })
     .catch(function(e){el.textContent='Error: '+e.message;});
 }
 
@@ -1010,6 +996,22 @@ function connectWs() {
   ws.onerror = function(){ ws.close(); };
   ws.onmessage = function(evt){
     var d; try{d=JSON.parse(evt.data);}catch(e){return;}
+
+    // Handle file system responses
+    if (d.hasOwnProperty('files')) {
+      var el = document.getElementById('fs-result');
+      if (!d.mounted) { el.textContent = 'File system not mounted'; return; }
+      var files = d.files || [];
+      if (!files.length) { el.textContent = 'No files found'; return; }
+      el.textContent = files.map(function(f){ return f.name + ' (' + f.size + ' bytes)'; }).join('\n');
+      return;
+    }
+    if (d.hasOwnProperty('fsContent')) {
+      var el = document.getElementById('fs-result');
+      el.textContent = d.fsContent;
+      return;
+    }
+
     if (d.l === 'otapct') {
       var pct = parseInt(d.m);
       var prog = document.getElementById('ota-progress');
