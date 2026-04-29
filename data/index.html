@@ -200,7 +200,7 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
       <div class="stat"><div class="label">Build</div><div class="value" id="s-build">—</div></div>
       <div class="stat"><div class="label">Time</div><div class="value" id="s-time">—</div></div>
       <div class="stat"><div class="label">NTP</div><div class="value" id="s-ntp">—</div></div>
-      <div class="stat"><div class="label">Batt</div><div class="value" id="s-batt">—</div></div>
+      <div class="stat"><div class="label">Vcc</div><div class="value" id="s-vcc">—</div></div>
     </div>
   </section>
 
@@ -365,11 +365,11 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
     <h2>Features</h2>
     <div class="form-row">
       <input type="checkbox" id="feat-wslog">
-      <label for="sleap-btn" style="width:auto;cursor:pointer">WebSocket Log (port 81)</label>
+      <label for="feat-wslog" style="width:auto;cursor:pointer">WebSocket Log (port 81)</label>
     </div>
     <div class="form-row">
       <input type="checkbox" id="feat-web">
-      <label for="sleap-btn" style="width:auto;cursor:pointer">Web UI (port 80)</label>
+      <label for="feat-web" style="width:auto;cursor:pointer">Web UI (port 80)</label>
     </div>
     <div id="feat-web-warn" class="feat-warn" style="display:none">Disabling requires MQTT cmd to re-enable</div>
     <button class="btn" onclick="saveFeatures()">Apply</button>
@@ -424,7 +424,7 @@ function loadState() {
       set('s-sample', d.sampleNum);
       set('s-tele',   d.teleInterval + ' min');
       set('s-build',  d.build);
-      set('s-batt',   (d.vcc && d.vcc > 0) ? d.vcc + ' V' : '—');
+      set('s-vcc',   (d.vcc && d.vcc > 0) ? d.vcc + ' V' : '—');
       if (d.ntpSynced && d.epochTime) {
         var dt = new Date(d.epochTime*1000);
         set('s-time', pad(dt.getHours())+':'+pad(dt.getMinutes())+':'+pad(dt.getSeconds()));
