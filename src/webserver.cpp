@@ -482,6 +482,38 @@ static void handleConfigReset() {
 // ─── GET /api/fs ──────────────────────────────────────────────────────────────
 
 static void handleGetFs() {
+    String filename = httpServer.arg("file");
+    
+    // If file parameter is provided, read and return file content via WebSocket
+    if (filename.length() > 0) {
+        if (!lfsReady) {
+            broadcastFsContent("Error: File system not mounted");
+            httpServer.send(200, "text/plain", "OK");
+            return;
+        }
+        String fullPath = filename;
+        if (!fullPath.startsWith("/")) {
+            fullPath = "/" + fullPath;
+        }
+        if (!LittleFS.exists(fullPath)) {
+            broadcastFsContent("Error: File not found: " + filename);
+            httpServer.send(200, "text/plain", "OK");
+            return;
+        }
+        File file = LittleFS.open(fullPath, "r");
+        if (!file) {
+            broadcastFsContent("Error: Failed to open file");
+            httpServer.send(200, "text/plain", "OK");
+            return;
+        }
+        String content = file.readString();
+        file.close();
+        broadcastFsContent(content);
+        httpServer.send(200, "text/plain", "OK");
+        return;
+    }
+    
+    // Otherwise, list files via WebSocket
     JsonDocument doc;
     doc["mounted"] = lfsReady;
     JsonArray files = doc["files"].to<JsonArray>();
@@ -496,6 +528,13 @@ static void handleGetFs() {
         }
         root.close();
     }
+    
+    // Send file list via WebSocket
+    String output;
+    serializeJson(doc, output);
+    broadcastFsList(output);
+    
+    // Also return JSON for direct HTTP calls
     sendJsonDoc(200, doc);
 }
 

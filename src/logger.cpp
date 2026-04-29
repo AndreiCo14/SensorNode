@@ -69,6 +69,20 @@ void broadcastOnTime(uint16_t onTimeSec) {
     wsServer.broadcastTXT(out);
 }
 
+void broadcastFsList(const String& json) {
+    if (!wsStarted) return;
+    wsServer.broadcastTXT(json);
+}
+
+void broadcastFsContent(const String& content) {
+    if (!wsStarted) return;
+    JsonDocument doc;
+    doc["fsContent"] = content;
+    String out;
+    serializeJson(doc, out);
+    wsServer.broadcastTXT(out);
+}
+
 static LogEntry ringBuffer[LOG_RING_SIZE];
 static size_t   ringIndex = 0;
 static SemaphoreHandle_t ringMutex = NULL;
