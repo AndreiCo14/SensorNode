@@ -9,11 +9,11 @@ bool Sht30Sensor::begin(int i2c_sda, int i2c_scl, int, int, int) {
     _ready = false;
     Wire.begin(i2c_sda, i2c_scl);
     if (!sht31.begin(_addr)) {
-        logMessage("SHT30/31 not found at 0x" + String(_addr, HEX), "warn");
+        logMessageFmt("warn", "SHT30/31 not found at 0x%X", _addr);
         return false;
     }
     _ready = true;
-    logMessage("SHT30/31 OK (0x" + String(_addr, HEX) + ")", "info");
+    logMessageFmt("info", "SHT30/31 OK (0x%X)", _addr);
     return true;
 }
 
@@ -26,7 +26,7 @@ bool Sht30Sensor::read(SensorReading& r) {
     float hum  = sht31.readHumidity();
 
     if (isnan(temp) || isnan(hum)) {
-        logMessage("SHT30 read failed", "warn");
+        logMessage("warn", "SHT30 read failed");
         return false;
     }
 

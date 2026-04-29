@@ -8,11 +8,11 @@ static BMP581 bmp581;
 bool Bmp580Sensor::begin(int, int, int, int, int) {
     _ready = false;
     if (bmp581.beginI2C(_addr, Wire) != BMP5_OK) {
-        logMessage("BMP580 not found at 0x" + String(_addr, HEX), "warn");
+        logMessageFmt("warn", "BMP580 not found at 0x%X", _addr);
         return false;
     }
     _ready = true;
-    logMessage("BMP580 OK (0x" + String(_addr, HEX) + ")", "info");
+    logMessageFmt("info", "BMP580 OK (0x%X)", _addr);
     return true;
 }
 
@@ -23,7 +23,7 @@ bool Bmp580Sensor::read(SensorReading& r) {
 
     bmp5_sensor_data data = {0, 0};
     if (bmp581.getSensorData(&data) != BMP5_OK) {
-        logMessage("BMP580 read failed", "warn");
+        logMessage("warn", "BMP580 read failed");
         return false;
     }
 

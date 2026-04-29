@@ -44,11 +44,11 @@ bool Xdb401Sensor::begin(int, int, int, int, int) {
     _ready = false;
     float p, t;
     if (!measure(_addr, _fullscale_pa, p, t)) {
-        logMessage("XDB401 not found at 0x" + String(_addr, HEX), "warn");
+        logMessageFmt("warn", "XDB401 not found at 0x%X", _addr);
         return false;
     }
     _ready = true;
-    logMessage("XDB401 OK (0x" + String(_addr, HEX) + ")", "info");
+    logMessageFmt("info", "XDB401 OK (0x%X)", _addr);
     return true;
 }
 
@@ -59,7 +59,7 @@ bool Xdb401Sensor::read(SensorReading& r) {
 
     float press_hpa, temp_c;
     if (!measure(_addr, _fullscale_pa, press_hpa, temp_c)) {
-        logMessage("XDB401 read failed", "warn");
+        logMessage("warn", "XDB401 read failed");
         return false;
     }
 

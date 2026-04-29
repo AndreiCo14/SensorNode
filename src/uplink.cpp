@@ -92,7 +92,7 @@ static void publishSleepStatus(uint32_t sleepSec) {
     buildTopic(topic, sizeof(topic), TOPIC_STATUS_SUFFIX);
     snprintf(payload, sizeof(payload), "{\"sleepTime\":%lu}", (unsigned long)sleepSec);
     MQTT_PUBLISH(topic, 0, false, payload);
-    logMessage("MQTT → " + String(topic) + " " + payload, "info");
+    logMessageFmt("info", "MQTT → %s %s", topic, payload);
 }
 
 // ─── Epoch time ───────────────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ static void publishSensorData(const SensorReading* batch, uint8_t count) {
     char topic[64];
     buildTopic(topic, sizeof(topic), TOPIC_DATA_SUFFIX);
     MQTT_PUBLISH(topic, 0, false, payload);
-    logMessage("Published " + String(count) + " readings -> " + topic, "info");
+    logMessageFmt("info", "Published %d readings -> %s", count, topic);
 
     if (mqttSecure || mqttPlain) ledSetState(LED_MQTT_OK);
 }
@@ -173,7 +173,7 @@ void sendTelemetry() {
     char topic[64];
     buildTopic(topic, sizeof(topic), TOPIC_TELE_SUFFIX);
     MQTT_PUBLISH(topic, 0, false, payload);
-    logMessage(String("MQTT -> ") + topic, "info");
+    logMessageFmt("info", "MQTT -> %s", topic);
 
     STATE_SET(lastTeleSent, (int32_t)now);
 }
@@ -209,7 +209,7 @@ static void publishStart() {
     char topic[64];
     buildTopic(topic, sizeof(topic), TOPIC_START_SUFFIX);
     MQTT_PUBLISH(topic, 0, false, payload);
-    logMessage(String("MQTT -> ") + topic, "info");
+    logMessageFmt("info", "MQTT -> %s", topic);
     if (s_startupWindowMs == 0)
         s_startupWindowMs = millis();  // start the broker-response window
 }
@@ -235,23 +235,23 @@ static int doHttpOta(const char* url) {
     ESPhttpUpdate.onProgress([](int cur, int total) {
         if (total <= 0) return;
         int pct = (cur * 100) / total;
-        if (pct >= s_lastPct + 10) { s_lastPct = pct; logMessage(String(pct), "otapct"); }
+        if (pct >= s_lastPct + 10) { s_lastPct = pct; logMessageFmt("otapct", "%d", pct); }
     });
     for (int attempt = 1; attempt <= 2; attempt++) {
-        logMessage(String("OTA: fetching ") + httpUrl + (attempt > 1 ? " (retry)" : ""), "info");
+        logMessageFmt("info", "OTA: fetching %s%s", httpUrl, (attempt > 1 ? " (retry)" : ""));
         // Flush queued log messages before blocking on update
         while (uxQueueMessagesWaiting(logQueue)) loggerProcess();
         s_lastPct = -1;
         WiFiClient client;
         HTTPUpdateResult res = ESPhttpUpdate.update(client, httpUrl);
         if (res == HTTP_UPDATE_OK) {
-            logMessage("OTA complete — rebooting", "info");
+            logMessage("info", "OTA complete — rebooting");
             while (uxQueueMessagesWaiting(logQueue)) loggerProcess();
             return 0;
         }
-        logMessage("OTA failed: " + String(ESPhttpUpdate.getLastErrorString()), "error");
+        logMessageFmt("error", "OTA failed: %s", ESPhttpUpdate.getLastErrorString().c_str());
         if (attempt < 2) {
-            logMessage("OTA retry in 5s...", "warn");
+            logMessage("warn", "OTA retry in 5s...");
             delay(5000);
         }
     }
@@ -262,7 +262,7 @@ static int doHttpOta(const char* url) {
 static int doHttpOta(const char* url) {
     ledSetState(LED_OTA);
     ledUpdate();  // push cyan to hardware immediately before blocking
-    logMessage(String("OTA: fetching ") + url, "info");
+    logMessageFmt("info", "OTA: fetching %s", url);
     bool isHttps = (strncmp(url, "https", 5) == 0);
 
     WiFiClientSecure secureClient;
@@ -279,14 +279,14 @@ static int doHttpOta(const char* url) {
 
     int code = http.GET();
     if (code != HTTP_CODE_OK) {
-        logMessage("OTA HTTP error: " + String(code), "error");
+        logMessageFmt("error", "OTA HTTP error: %d", code);
         http.end();
         return 1;
     }
 
     int totalSize = http.getSize();
     if (!Update.begin(totalSize > 0 ? (size_t)totalSize : UPDATE_SIZE_UNKNOWN)) {
-        logMessage("OTA begin failed: " + String(Update.errorString()), "error");
+        logMessageFmt("error", "OTA begin failed: %s", Update.errorString());
         http.end();
         return 2;
     }
@@ -295,15 +295,15 @@ static int doHttpOta(const char* url) {
     Update.onProgress([](size_t cur, size_t total) {
         if (total == 0) return;
         int pct = (int)((cur * 100) / total);
-        if (pct >= s_lastPct + 10) { s_lastPct = pct; logMessage(String(pct), "otapct"); }
+        if (pct >= s_lastPct + 10) { s_lastPct = pct; logMessageFmt("otapct", "%d", pct); }
     });
     Update.writeStream(*http.getStreamPtr());
     if (!Update.end(true)) {
-        logMessage("OTA failed: " + String(Update.errorString()), "error");
+        logMessageFmt("error", "OTA failed: %s", Update.errorString());
         http.end();
         return 3;
     }
-    logMessage("OTA complete", "info");
+    logMessage("info", "OTA complete");
     http.end();
     return 0;
 }
@@ -317,11 +317,11 @@ static void doOtaCheck() {
 #endif
 
     if (strlen(OTA_VERSION_URL) == 0) {
-        logMessage("OTA_VERSION_URL not set", "warn");
+        logMessage("warn", "OTA_VERSION_URL not set");
         OTA_FLUSH();
         return;
     }
-    logMessage("OTA check: " + String(OTA_VERSION_URL), "info");
+    logMessageFmt("info", "OTA check: %s", OTA_VERSION_URL);
     OTA_FLUSH();  // send before blocking request
 
 #ifdef ESP8266
@@ -341,7 +341,7 @@ static void doOtaCheck() {
     http.setTimeout(10000);
     int code = http.GET();
     if (code != HTTP_CODE_OK) {
-        logMessage("OTA check failed: " + String(code), "error");
+        logMessageFmt("error", "OTA check failed: %d", code);
         http.end();
         OTA_FLUSH();
         return;
@@ -350,7 +350,7 @@ static void doOtaCheck() {
     JsonDocument doc;
     if (deserializeJson(doc, http.getString())) {
         http.end();
-        logMessage("OTA version JSON invalid", "error");
+        logMessage("error", "OTA version JSON invalid");
         OTA_FLUSH();
         return;
     }
@@ -359,17 +359,17 @@ static void doOtaCheck() {
     const char* remoteBuild = doc["build"];
     const char* binUrl      = doc["url"];
     if (!remoteBuild || !binUrl) {
-        logMessage("OTA version JSON missing fields", "error");
+        logMessage("error", "OTA version JSON missing fields");
         OTA_FLUSH();
         return;
     }
     if (strcmp(remoteBuild, FW_BUILD) == 0) {
-        logMessage(String("OTA: up to date (") + FW_BUILD + ")", "info");
+        logMessageFmt("info", "OTA: up to date (%s)", FW_BUILD);
         OTA_FLUSH();
         return;
     }
 
-    logMessage(String("OTA: new build ") + remoteBuild + " -> updating", "info");
+    logMessageFmt("info", "OTA: new build %s -> updating", remoteBuild);
     int result = doHttpOta(binUrl);
     if (result == 0) { vTaskDelay(pdMS_TO_TICKS(500)); DEVICE_RESTART(); }
 
@@ -425,7 +425,7 @@ static String exportProvisioningConfig() {
 static void handleProvisioningConfig(const char* payload) {
     JsonDocument doc;
     if (deserializeJson(doc, payload)) {
-        logMessage("Provision JSON parse failed", "error");
+        logMessage("error", "Provision JSON parse failed");
         return;
     }
 
@@ -484,9 +484,9 @@ static void handleProvisioningConfig(const char* payload) {
         if (!doc["5v_pin"].isNull())        hwLog += " 5v=" + String(hw.pin5v);
         for (uint8_t i = 0; i < hw.gpio_count; i++)
             if (hw.gpio_pin[i] >= 0) hwLog += " gpio" + String(hw.gpio_pin[i]) + "=" + hw.gpio_mode[i];
-        logMessage(hwLog, "info");
+        logMessageFmt("info", "%s", hwLog.c_str());
     } else {
-        logMessage("Provision: no hw fields changed, provisioned flag set", "info");
+        logMessage("info", "Provision: no hw fields changed, provisioned flag set");
     }
 
     if (doc["sensors"].is<JsonArray>()) {
@@ -502,8 +502,7 @@ static void handleProvisioningConfig(const char* payload) {
                         strncpy(hw.gpio_mode[hw.gpio_count], inv ? "invert" : "follow", 7);
                         hw.gpio_count++;
                         saveHwConfig(hw);
-                        logMessage("Provision: migrated pms7003 set_pin → gpio" +
-                                   String(pin) + "=" + hw.gpio_mode[hw.gpio_count - 1], "info");
+                        logMessageFmt("info", "Provision: migrated pms7003 set_pin → gpio%d=%s", pin, hw.gpio_mode[hw.gpio_count - 1]);
                     }
                     break;
                 }
@@ -515,13 +514,15 @@ static void handleProvisioningConfig(const char* payload) {
         }
         saveSensorSetup();
         sensorsReinit();
-        String sLog = "Provision: sensors —";
+        char sLog[256];
+        char* p = sLog;
+        p += snprintf(p, sizeof(sLog) - (p - sLog), "Provision: sensors —");
         for (JsonObject s : doc["sensors"].as<JsonArray>()) {
-            sLog += " [" + String(s["type"] | "?");
-            sLog += s["enabled"] | false ? " ON" : " off";
-            sLog += "]";
+            const char* type = s["type"] | "?";
+            bool enabled = s["enabled"] | false;
+            p += snprintf(p, sizeof(sLog) - (p - sLog), " [%s %s]", type, enabled ? "ON" : "off");
         }
-        logMessage(sLog, "info");
+        logMessageFmt("info", "%s", sLog);
     }
 
     if (doc["mqtt"].is<JsonObject>()) {
@@ -533,14 +534,14 @@ static void handleProvisioningConfig(const char* payload) {
         if (!mqtt["prefix"].isNull()) strncpy(cfg.prefix, mqtt["prefix"].as<const char*>(), sizeof(cfg.prefix) - 1);
         if (!mqtt["tls"].isNull())    cfg.tls    = mqtt["tls"].as<bool>();
         saveMqttConfig(cfg);
-        logMessage(String("Provision: MQTT broker=") + cfg.broker + " port=" + cfg.port + " tls=" + (cfg.tls?"yes":"no") + " (reconnect to apply)", "info");
+        logMessageFmt("info", "Provision: MQTT broker=%s port=%d tls=%s (reconnect to apply)", cfg.broker, cfg.port, cfg.tls ? "yes" : "no");
     }
 }
 
 static void handleCommand(const char* payload) {
     JsonDocument doc;
     if (deserializeJson(doc, payload)) {
-        logMessage("Command JSON parse failed", "error");
+        logMessage("error", "Command JSON parse failed");
         return;
     }
 
@@ -551,9 +552,9 @@ static void handleCommand(const char* payload) {
         loadFeatures(f);
         if      (strcmp(name, "web")   == 0) f.web   = val;
         else if (strcmp(name, "wsLog") == 0) f.wsLog = val;
-        else { logMessage(String("Unknown feature: ") + name, "warn"); return; }
+        else { logMessageFmt("warn", "Unknown feature: %s", name); return; }
         saveFeatures(f);
-        logMessage(String("feature '") + name + "' -> " + (val ? "on" : "off") + ", rebooting", "info");
+        logMessageFmt("info", "feature '%s' -> %s, rebooting", name, val ? "on" : "off");
         vTaskDelay(pdMS_TO_TICKS(500));
         DEVICE_RESTART();
         return;
@@ -565,7 +566,7 @@ static void handleCommand(const char* payload) {
         uint16_t v = doc["teleIntervalM"];
         STATE_SET(teleIntervalM, v);
         broadcastTeleInterval(v);
-        logMessage(String("teleIntervalM -> ") + String(v), "info");
+        logMessageFmt("info", "teleIntervalM -> %d", v);
         needsSave = true;
     }
 
@@ -578,7 +579,7 @@ static void handleCommand(const char* payload) {
         uint16_t v = doc["onTime"];
         if (v < 30) v = 30;
         STATE_SET(onTime, v);
-        logMessage(String("onTime -> ") + v, "info");
+        logMessageFmt("info", "onTime -> %d", v);
         broadcastOnTime(v);
         needsSave = true;
     }
@@ -586,14 +587,14 @@ static void handleCommand(const char* payload) {
     if (!doc["deepSleep"].isNull()) {
         bool val = doc["deepSleep"].as<bool>();
         setDeepSleepMode(val);
-        logMessage(String("deepSleep -> ") + (val ? "on" : "off"), "info");
+        logMessageFmt("info", "deepSleep -> %s", (val ? "on" : "off"));
         needsSave = true;
     }
 
     if (!doc["ignoreCmd"].isNull()) {
         bool val = doc["ignoreCmd"].as<bool>();
         setIgnoreCmdMode(val);
-        logMessage(String("ignoreCmd -> ") + (val ? "on" : "off"), "info");
+        logMessageFmt("info", "ignoreCmd -> %s", (val ? "on" : "off"));
         needsSave = true;
     }
 
@@ -606,13 +607,13 @@ static void handleCommand(const char* payload) {
         hw.deepSleep     = getDeepSleepMode();
         hw.ignoreCmd     = getIgnoreCmdMode();
         saveHwConfig(hw);
-        logMessage("hwconfig saved", "info");
+        logMessage("info", "hwconfig saved");
     }
 
     if (!doc["debugLog"].isNull()) {
         bool en = doc["debugLog"].as<bool>();
         setDebugLog(en);
-        logMessage(String("debugLog -> ") + (en ? "on" : "off"), "info");
+        logMessageFmt("info", "debugLog -> %s", (en ? "on" : "off"));
     }
 
     // maintenance:true  — pause deep sleep cycle, stay online (set in Start reply)
@@ -621,9 +622,9 @@ static void handleCommand(const char* payload) {
         bool m = doc["maintenance"].as<bool>();
         setMaintenanceMode(m);
         if (m) {
-            logMessage("Maintenance mode — deep sleep paused", "info");
+            logMessage("info", "Maintenance mode — deep sleep paused");
         } else {
-            logMessage("Maintenance ended — deep sleep cycle resuming", "info");
+            logMessage("info", "Maintenance ended — deep sleep cycle resuming");
         }
     }
 
@@ -634,8 +635,8 @@ static void handleCommand(const char* payload) {
 
     if (doc["cmd"].is<const char*>()) {
         const char* cmd = doc["cmd"];
-        if (strcmp(cmd, "reboot")    == 0) { logMessage("Rebooting", "warn"); vTaskDelay(pdMS_TO_TICKS(500)); DEVICE_RESTART(); }
-        if (strcmp(cmd, "wifiReset") == 0) { clearWifiCreds(); logMessage("WiFi credentials cleared — rebooting", "warn"); vTaskDelay(pdMS_TO_TICKS(500)); DEVICE_RESTART(); }
+        if (strcmp(cmd, "reboot")    == 0) { logMessage("warn", "Rebooting"); vTaskDelay(pdMS_TO_TICKS(500)); DEVICE_RESTART(); }
+        if (strcmp(cmd, "wifiReset") == 0) { clearWifiCreds(); logMessage("warn", "WiFi credentials cleared — rebooting"); vTaskDelay(pdMS_TO_TICKS(500)); DEVICE_RESTART(); }
         if (strcmp(cmd, "telemetry") == 0) sendTelemetry();
         if (strcmp(cmd, "otaCheck")  == 0) doOtaCheck();
         if (strcmp(cmd, "configRestore") == 0) {
@@ -646,9 +647,9 @@ static void handleCommand(const char* payload) {
                 saveHwConfig(hw);
                 publishStart();
                 MQTT_SUBSCRIBE(s_provisionTopic, 0);
-                logMessage("Config restore requested — provisioned=false, awaiting provision payload", "info");
+                logMessage("info", "Config restore requested — provisioned=false, awaiting provision payload");
             } else {
-                logMessage("Config restore failed — not connected", "warn");
+                logMessage("warn", "Config restore failed — not connected");
             }
         }
         if (strcmp(cmd, "configBackup") == 0) {
@@ -656,7 +657,7 @@ static void handleCommand(const char* payload) {
             buildTopic(backupTopic, sizeof(backupTopic), TOPIC_PROVISION_BACKUP_SUFFIX);
             String cfgJson = exportProvisioningConfig();
             MQTT_PUBLISH(backupTopic, 1, false, cfgJson.c_str());
-            logMessage(String("Config backup -> ") + backupTopic, "info");
+            logMessageFmt("info", "Config backup -> %s", backupTopic);
         }
         if (strcmp(cmd, "wifiOn")    == 0) apRequested = true;
         if (strcmp(cmd, "wifiOff")   == 0) {
@@ -665,7 +666,7 @@ static void handleCommand(const char* payload) {
                 WiFi.softAPdisconnect(true);
                 WiFi.mode(WIFI_STA);
                 STATE_SET(apMode, false);
-                logMessage("AP closed", "info");
+                logMessage("info", "AP closed");
             }
         }
     }
@@ -675,7 +676,7 @@ static void handleCommand(const char* payload) {
 
 static void onMqttConnect(bool) {
     STATE_SET(mqttConnected, true);
-    logMessage("MQTT connected (heap:" + String(FREE_HEAP()) + ")", "info");
+    logMessageFmt("info", "MQTT connected (heap:%d)", FREE_HEAP());
     ledSetState(LED_MQTT_OK);
 
     snprintf(s_cmdTopic, sizeof(s_cmdTopic), "%s%lu%s",
@@ -700,15 +701,15 @@ static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
     s_subscribeFailLogged = false;
     s_provisionPending   = false;
     ledSetState(LED_CONNECTING);
-    logMessage(String("MQTT disconnected: ") + espMqttClientTypes::disconnectReasonToString(reason), "warn");
+    logMessageFmt("warn", "MQTT disconnected: %s", espMqttClientTypes::disconnectReasonToString(reason));
 }
 
 static void onMqttSubscribe(uint16_t packetId, const espMqttClientTypes::SubscribeReturncode* codes, size_t len) {
     for (size_t i = 0; i < len; ++i) {
         if (codes[i] == espMqttClientTypes::SubscribeReturncode::FAIL)
-            logMessage("Subscribe ACK REJECTED (id:" + String(packetId) + ")", "error");
+            logMessageFmt("error", "Subscribe ACK REJECTED (id:%d)", packetId);
         else
-            logMessage("Subscribe ACK ok (id:" + String(packetId) + ")", "info");
+            logMessageFmt("info", "Subscribe ACK ok (id:%d)", packetId);
     }
     if (!s_publishStartSent) {
         publishStart();
@@ -725,7 +726,7 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties&,
         s_provisionPayload = "";
         s_provisionPayload.concat((const char*)payload, len);
         s_provisionPending = true;
-        logMessage("Provision config received", "info");
+        logMessage("info", "Provision config received");
         return;
     }
 
@@ -733,11 +734,11 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties&,
     size_t copyLen = len < sizeof(cmd.payload) - 1 ? len : sizeof(cmd.payload) - 1;
     memcpy(cmd.payload, payload, copyLen);
     cmd.payload[copyLen] = '\0';
-    logMessage(String("MQTT rx [") + topic + "]: " + cmd.payload, "info");
+    logMessageFmt("info", "MQTT rx [%s]: %s", topic, cmd.payload);
 
     // Ignore external MQTT commands if ignoreCmd mode is enabled or system is not ready yet
     if (getIgnoreCmdMode()) {
-        logMessage(String("MQTT command ignored [") + topic + "]: ignoreCmd mode active", "info");
+        logMessageFmt("info", "MQTT command ignored [%s]: ignoreCmd mode active", topic);
         return;
     }
 
@@ -777,8 +778,7 @@ static void initMqtt() {
         mqttPlain->setCleanSession(true);
         mqttPlain->connect();
     }
-    logMessage(String("MQTT connecting to ") + mqttCfgData.broker + ":" +
-               String(mqttCfgData.port) + (mqttCfgData.tls ? " (TLS)" : ""), "info");
+    logMessageFmt("info", "MQTT connecting to %s:%d%s", mqttCfgData.broker, mqttCfgData.port, mqttCfgData.tls ? " (TLS)" : "");
 }
 
 // ─── WiFi reconnect helpers ───────────────────────────────────────────────────
@@ -806,7 +806,7 @@ static void wifiReconnectTick(const char* ssid1, const char* pass1,
         dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
         STATE_SET(apMode, true);
         ledSetState(LED_AP);
-        logMessage(String("No network — AP raised: ") + g_apSsid, "warn");
+        logMessageFmt("warn", "No network — AP raised: %s", g_apSsid);
     }
 
     // Rate-limited: phase 3 uses a longer interval to avoid hammering the radio
@@ -820,20 +820,20 @@ static void wifiReconnectTick(const char* ssid1, const char* pass1,
         // Phases 1 & 2: straight primary → secondary progression
         if (lostFor < WIFI_RECONN_PRIMARY_MS || !hasSec) {
             trySsid = ssid1; tryPass = pass1;
-            logMessage(String("WiFi reconnect → ") + ssid1, "warn");
+            logMessageFmt("warn", "WiFi reconnect → %s", ssid1);
         } else {
             trySsid = ssid2; tryPass = pass2;
-            logMessage(String("WiFi reconnect → ") + ssid2 + " (secondary)", "warn");
+            logMessageFmt("warn", "WiFi reconnect → %s (secondary)", ssid2);
         }
     } else {
         // Phase 3: alternate primary / secondary every tick
         if (hasSec) s_wifiAltSecondary = !s_wifiAltSecondary;
         if (s_wifiAltSecondary && hasSec) {
             trySsid = ssid2; tryPass = pass2;
-            logMessage(String("WiFi retry → ") + ssid2, "warn");
+            logMessageFmt("warn", "WiFi retry → %s", ssid2);
         } else {
             trySsid = ssid1; tryPass = pass1;
-            logMessage(String("WiFi retry → ") + ssid1, "warn");
+            logMessageFmt("warn", "WiFi retry → %s", ssid1);
         }
     }
     WiFi.disconnect(false);
@@ -842,7 +842,7 @@ static void wifiReconnectTick(const char* ssid1, const char* pass1,
 
 // Call once when WiFi transitions to connected. Cleans up any reconnect-raised AP.
 static void wifiReconnected() {
-    logMessage("WiFi connected: " + WiFi.localIP().toString(), "info");
+    logMessageFmt("info", "WiFi connected: %s", WiFi.localIP().toString().c_str());
     STATE_SET(wifiConnected, true);
     s_wifiWasConnected   = true;
     s_wifiLostAt         = 0;
@@ -854,7 +854,7 @@ static void wifiReconnected() {
         WiFi.mode(WIFI_STA);
         STATE_SET(apMode, false);
         s_reconnApRaised = false;
-        logMessage("Network restored — AP closed", "info");
+        logMessage("info", "Network restored — AP closed");
     }
     ledSetState(LED_CONNECTED);
 }
@@ -874,17 +874,17 @@ static bool wifiApWindow(const char* ssid1, const char* pass1,
     STATE_SET(apMode, true);
     STATE_SET(wifiConnected, true);
 
-    logMessage(String("AP: ") + g_apSsid + " @ 192.168.4.1 (3 min)", "warn");
+    logMessageFmt("warn", "AP: %s @ 192.168.4.1 (3 min)", g_apSsid);
     ledSetState(hasSta ? LED_CONNECTING : LED_AP);
 
     if (hasPrimary) {
         WiFi.setHostname(g_apSsid);
         WiFi.begin(ssid1, pass1);
-        logMessage(String("STA -> ") + ssid1, "info");
+        logMessageFmt("info", "STA -> %s", ssid1);
     } else if (hasSecondary) {
         WiFi.setHostname(g_apSsid);
         WiFi.begin(ssid2, pass2);
-        logMessage(String("STA -> ") + ssid2, "info");
+        logMessageFmt("info", "STA -> %s", ssid2);
     }
 
     uint32_t t0       = millis();
@@ -899,7 +899,7 @@ static bool wifiApWindow(const char* ssid1, const char* pass1,
             handleCommand(cmd.payload);
 
         if (hasSta && WiFi.status() == WL_CONNECTED) {
-            logMessage("WiFi STA: " + WiFi.localIP().toString(), "info");
+            logMessageFmt("info", "WiFi STA: %s", WiFi.localIP().toString().c_str());
             STATE_SET(wifiConnected, true);
             return true;
         }
@@ -908,13 +908,13 @@ static bool wifiApWindow(const char* ssid1, const char* pass1,
             triedSecondary = true;
             WiFi.disconnect(false);
             WiFi.begin(ssid2, pass2);
-            logMessage(String("STA fallback -> ") + ssid2, "info");
+            logMessageFmt("info", "STA fallback -> %s", ssid2);
         }
 
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 
-    logMessage("AP window expired — no STA", "warn");
+    logMessage("warn", "AP window expired — no STA");
     return false;
 }
 
@@ -929,20 +929,20 @@ static void tryDeferredSubscribe() {
     if (mqttSecure) subId = mqttSecure->subscribe(s_cmdTopic, 0);
     else if (mqttPlain) subId = mqttPlain->subscribe(s_cmdTopic, 0);
     if (subId) {
-        logMessage("Subscribed: " + String(s_cmdTopic), "info");
+        logMessageFmt("info", "Subscribed: %s", s_cmdTopic);
         // Also subscribe to provisioning topic (QoS 0 — retained msg delivery only)
         if (mqttSecure) mqttSecure->subscribe(s_provisionTopic, 0);
         else if (mqttPlain) mqttPlain->subscribe(s_provisionTopic, 0);
-        logMessage("Subscribed: " + String(s_provisionTopic), "info");
+        logMessageFmt("info", "Subscribed: %s", s_provisionTopic);
         s_needsSubscribe     = false;
         s_subscribeFailLogged = false;
     } else if (!s_subscribeFailLogged) {
         s_subscribeFailLogged = true;
-        String msg = "Subscribe FAILED heap:" + String(FREE_HEAP());
 #ifdef ESP8266
-        msg += " maxBlock:" + String(ESP.getMaxFreeBlockSize());
+        logMessageFmt("error", "Subscribe FAILED heap: %d maxBlock: %d", FREE_HEAP(), ESP.getMaxFreeBlockSize());
+#else
+        logMessageFmt("error", "Subscribe FAILED heap: %d", FREE_HEAP());
 #endif
-        logMessage(msg, "error");
     }
     if (!s_publishStartSent) { publishStart(); s_publishStartSent = true; }
 }
@@ -964,7 +964,7 @@ void uplinkTask(void* pvParameters) {
 
     if (!staConnected) {
         // wifiApWindow already exhausted primary+secondary; enter phase 3 immediately
-        logMessage("No STA — AP up, retrying networks", "warn");
+        logMessage("warn", "No STA — AP up, retrying networks");
         ledSetState(LED_AP);
         s_reconnApRaised   = true;  // AP already up from wifiApWindow
         s_wifiLostAt       = millis() - (WIFI_RECONN_PRIMARY_MS + WIFI_RECONN_SECONDARY_MS);
@@ -990,7 +990,7 @@ void uplinkTask(void* pvParameters) {
     WiFi.softAPdisconnect(true);
     WiFi.mode(WIFI_STA);
     STATE_SET(apMode, false);
-    logMessage("AP closed, STA mode", "info");
+    logMessage("info", "AP closed, STA mode");
     ledSetState(LED_CONNECTED);
 
     configTzTime(MYTZ, "time.google.com", "pool.ntp.org");
@@ -1014,7 +1014,7 @@ void uplinkTask(void* pvParameters) {
                 if (batchCount < 10)
                     batch[batchCount++] = reading;
                 else {
-                    logMessage("Batch overflow — dropping oldest", "warn");
+                    logMessage("warn", "Batch overflow — dropping oldest");
                     memmove(batch, batch + 1, sizeof(SensorReading) * 9);
                     batch[9] = reading;
                 }
@@ -1034,10 +1034,10 @@ void uplinkTask(void* pvParameters) {
             millis() - s_startupWindowMs >= STARTUP_CMD_WINDOW_MS) {
             s_sensorsStarted = true;
             if (getDeepSleepMode() && !getMaintenanceMode()) {
-                logMessage("Startup window: deep sleep mode — onTime=" + String(STATE_GET(onTime)) + "s, interval=" + String(STATE_GET(teleIntervalM)) + "m", "debug");
+                logMessageFmt("debug", "Startup window: deep sleep mode — onTime=%ds, interval=%dm", STATE_GET(onTime), STATE_GET(teleIntervalM));
                 sensorsEnableDeepSleep();
             } else {
-                logMessage(String("Startup window: normal mode") + (getDeepSleepMode() ? " (maintenance override)" : ""), "debug");
+                logMessageFmt("debug", "Startup window: normal mode%s", (getDeepSleepMode() ? " (maintenance override)" : ""));
                 sensorsEnable();
             }
         }
@@ -1054,7 +1054,7 @@ void uplinkTask(void* pvParameters) {
 
             if (getDeepSleepMode() && !getMaintenanceMode()) {
                 uint32_t sleepSec = (uint32_t)STATE_GET(teleIntervalM) * 60UL;
-                logMessage("Deep sleep trigger: flushing MQTT, then sleeping " + String(sleepSec) + "s", "debug");
+                logMessageFmt("debug", "Deep sleep trigger: flushing MQTT, then sleeping %ds", sleepSec);
                 publishSleepStatus(sleepSec);
                 // Flush MQTT outbox before sleeping
                 for (int i = 0; i < 30; i++) { MQTT_LOOP(); vTaskDelay(pdMS_TO_TICKS(10)); }
@@ -1075,7 +1075,7 @@ void uplinkTask(void* pvParameters) {
             WiFi.softAP(g_apSsid);
             dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
             STATE_SET(apMode, true);
-            logMessage(String("AP re-enabled: ") + g_apSsid, "info");
+            logMessageFmt("info", "AP re-enabled: %s", g_apSsid);
         }
 
         if (WiFi.status() != WL_CONNECTED) {
@@ -1085,7 +1085,7 @@ void uplinkTask(void* pvParameters) {
                 s_lastWifiAttempt   = 0;
                 s_wifiAltSecondary  = false;
                 STATE_SET(wifiConnected, false);
-                logMessage("WiFi lost", "warn");
+                logMessage("warn", "WiFi lost");
             }
             ledSetState(LED_CONNECTING);
             wifiReconnectTick(wifiSsid, wifiPass, wifiSsid2, wifiPass2);
@@ -1103,7 +1103,7 @@ void uplinkTask(void* pvParameters) {
             uint32_t intervalMs = (uint32_t)mqttCfgData.reconnIntervalS * 1000;
             if (now32 - s_lastMqttAttempt >= intervalMs) {
                 s_lastMqttAttempt = now32;
-                logMessage("MQTT reconnecting...", "warn");
+                logMessage("warn", "MQTT reconnecting...");
                 MQTT_CONNECT();
             }
         }
@@ -1132,7 +1132,7 @@ void uplinkInit() {
         if (sdkSsid.length() > 0) {
             strncpy(s_ssid, sdkSsid.c_str(), sizeof(s_ssid) - 1);
             strncpy(s_pass, WiFi.psk().c_str(), sizeof(s_pass) - 1);
-            logMessage("No saved WiFi — SDK cache: " + sdkSsid, "warn");
+            logMessageFmt("warn", "No saved WiFi — SDK cache: %s", sdkSsid.c_str());
             if (lfsReady) saveWifiCreds(s_ssid, s_pass, s_ssid2, s_pass2);
         }
     }
@@ -1149,19 +1149,18 @@ void uplinkInit() {
     if (hasPrimary) {
         WiFi.setHostname(g_apSsid);
         WiFi.begin(s_ssid, s_pass);
-        logMessage(String("STA -> ") + s_ssid, "info");
+        logMessageFmt("info", "STA -> %s", s_ssid);
     } else if (hasSecondary) {
         WiFi.setHostname(g_apSsid);
         WiFi.begin(s_ssid2, s_pass2);
-        logMessage(String("STA -> ") + s_ssid2, "info");
+        logMessageFmt("info", "STA -> %s", s_ssid2);
     }
 
     s_apWindowStart  = millis();
     s_triedSecondary = !hasSecondary || !hasPrimary;
     s_uplinkState    = US_AP_WINDOW;
     ledSetState(hasSta ? LED_CONNECTING : LED_AP);
-    logMessage(String("AP: ") + g_apSsid + " @ 192.168.4.1 (" +
-               String(AP_WINDOW_MS / 1000) + "s window)", "warn");
+    logMessageFmt("warn", "AP: %s @ 192.168.4.1 (%ds window)", g_apSsid, AP_WINDOW_MS / 1000);
 }
 
 void uplinkProcess() {
@@ -1175,7 +1174,7 @@ void uplinkProcess() {
                 handleCommand(cmd.payload);
         }
         if (WiFi.status() == WL_CONNECTED) {
-            logMessage("WiFi STA: " + WiFi.localIP().toString(), "info");
+            logMessageFmt("info", "WiFi STA: %s", WiFi.localIP().toString().c_str());
             dnsServer.stop();
             WiFi.softAPdisconnect(true);
             WiFi.mode(WIFI_STA);
@@ -1193,10 +1192,10 @@ void uplinkProcess() {
             s_triedSecondary = true;
             WiFi.disconnect(false);
             WiFi.begin(s_ssid2, s_pass2);
-            logMessage(String("STA fallback -> ") + s_ssid2, "info");
+            logMessageFmt("info", "STA fallback -> %s", s_ssid2);
         }
         if (millis() - s_apWindowStart > AP_WINDOW_MS) {
-            logMessage("AP window expired — no STA, retrying networks", "warn");
+            logMessage("warn", "AP window expired — no STA, retrying networks");
             ledSetState(LED_AP);
             s_uplinkState      = US_AP_ONLY;
             s_reconnApRaised   = true;  // AP already up from uplinkInit
@@ -1255,10 +1254,10 @@ void uplinkProcess() {
                 millis() - s_startupWindowMs >= STARTUP_CMD_WINDOW_MS) {
                 s_sensorsStarted = true;
                 if (getDeepSleepMode() && !getMaintenanceMode()) {
-                    logMessage("Startup window: deep sleep mode — onTime=" + String(STATE_GET(onTime)) + "s, interval=" + String(STATE_GET(teleIntervalM)) + "m", "debug");
+                    logMessageFmt("debug", "Startup window: deep sleep mode — onTime=%ds, interval=%dm", STATE_GET(onTime), STATE_GET(teleIntervalM));
                     sensorsEnableDeepSleep();
                 } else {
-                    logMessage(String("Startup window: normal mode") + (getDeepSleepMode() ? " (maintenance override)" : ""), "debug");
+                    logMessageFmt("debug", "Startup window: normal mode%s", (getDeepSleepMode() ? " (maintenance override)" : ""));
                     sensorsEnable();
                 }
             }
@@ -1275,7 +1274,7 @@ void uplinkProcess() {
 
                 if (getDeepSleepMode() && !getMaintenanceMode()) {
                     uint32_t sleepSec = (uint32_t)STATE_GET(teleIntervalM) * 60UL;
-                    logMessage("Deep sleep trigger: flushing MQTT, then sleeping " + String(sleepSec) + "s", "debug");
+                    logMessageFmt("debug", "Deep sleep trigger: flushing MQTT, then sleeping %ds", sleepSec);
                     publishSleepStatus(sleepSec);
                     MQTT_LOOP();
                     delay(200);
@@ -1296,7 +1295,7 @@ void uplinkProcess() {
                 WiFi.softAP(g_apSsid);
                 dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
                 STATE_SET(apMode, true);
-                logMessage(String("AP re-enabled: ") + g_apSsid, "info");
+                logMessageFmt("info", "AP re-enabled: %s", g_apSsid);
             }
 
             if (WiFi.status() != WL_CONNECTED) {
@@ -1306,7 +1305,7 @@ void uplinkProcess() {
                     s_lastWifiAttempt   = 0;
                     s_wifiAltSecondary  = false;
                     STATE_SET(wifiConnected, false);
-                    logMessage("WiFi lost", "warn");
+                    logMessage("warn", "WiFi lost");
                 }
                 ledSetState(LED_CONNECTING);
                 wifiReconnectTick(s_ssid, s_pass, s_ssid2, s_pass2);

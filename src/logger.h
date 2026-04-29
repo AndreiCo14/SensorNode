@@ -2,8 +2,8 @@
 
 #include <Arduino.h>
 
-void logMessage(const char* message, const char* level = "info");
-void logMessage(const String& message, const char* level = "info");
+void logMessage(const char* level, const char* message);
+void logMessageFmt(const char* level, const char* format, ...);
 void setDebugLog(bool en);
 bool getDebugLog();
 void setMaintenanceMode(bool en);

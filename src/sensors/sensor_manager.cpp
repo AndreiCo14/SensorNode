@@ -65,14 +65,14 @@ void sensorsInit() {
     // Build Wire only once; sensors share it
     if (hwCfg.i2c_sda >= 0 && hwCfg.i2c_scl >= 0) {
         Wire.begin(hwCfg.i2c_sda, hwCfg.i2c_scl);
-        logMessage("I2C Wire(" + String(hwCfg.i2c_sda) + "," + String(hwCfg.i2c_scl) + ") started", "info");
+        logMessageFmt("info", "I2C Wire(%d,%d) started", hwCfg.i2c_sda, hwCfg.i2c_scl);
     }
 
     sensorCount = 0;
     activeCount = 0;
 
     if (!xSemaphoreTake(sensorSetupMutex, pdMS_TO_TICKS(1000))) {
-        logMessage("sensorsInit: mutex timeout", "error");
+        logMessage("error", "sensorsInit: mutex timeout");
         return;
     }
 
@@ -86,7 +86,7 @@ void sensorsInit() {
 
         SensorBase* s = makeSensor(type);
         if (!s) {
-            logMessage(String("Unknown sensor type: ") + type, "warn");
+            logMessageFmt("warn", "Unknown sensor type: %s", type);
             continue;
         }
 
@@ -113,10 +113,7 @@ void sensorsInit() {
             bool conflict = false;
             for (uint8_t j = 0; j < sensorCount; j++) {
                 if (sensors[j] && sensors[j]->i2cAddr() == sAddr) {
-                    logMessage(String("I2C conflict: ") + type +
-                               " @ 0x" + String(sAddr, HEX) +
-                               " already used by " + sensors[j]->type() +
-                               " — skipped", "error");
+                    logMessageFmt("error", "I2C conflict: %s @ 0x%X already used by %s — skipped", type, sAddr, sensors[j]->type());
                     conflict = true;
                     break;
                 }
@@ -148,15 +145,14 @@ void sensorsInit() {
     if (sgp4x) {
         if (thSrc) {
             sgp4x->setCompensationSource(thSrc);
-            logMessage(String("SGP4x: compensation from ") + thSrc->type(), "info");
+            logMessageFmt("info", "SGP4x: compensation from %s", thSrc->type());
         } else {
-            logMessage("SGP4x: no T/H source — using default compensation (25°C, 50%RH)", "info");
+            logMessage("info", "SGP4x: no T/H source — using default compensation (25°C, 50%RH)");
         }
     }
 
     STATE_SET(sensorsActive, activeCount);
-    logMessage("Sensors: " + String(sensorCount) + " configured, " +
-               String(activeCount) + " active", "info");
+    logMessageFmt("info", "Sensors: %d configured, %d active", sensorCount, activeCount);
 }
 
 // ─── Sensor task ──────────────────────────────────────────────────────────────
@@ -196,7 +192,7 @@ void sensorsEnable() {
     if (intervalMs == 0) intervalMs = 60000UL;
     uint32_t readDelayMs = (uint32_t)onTimeSec * 1000UL;
     s_lastRead = millis() - intervalMs + readDelayMs;
-    logMessage("Sensors enabled — first read in " + String(onTimeSec) + "s", "info");
+    logMessageFmt("info", "Sensors enabled — first read in %ds", onTimeSec);
 }
 
 void sensorsEnableDeepSleep() {
@@ -210,7 +206,7 @@ void sensorsEnableDeepSleep() {
     if (intervalMs == 0) intervalMs = 60000UL;
     uint32_t readDelayMs = ((uint32_t)onTimeSec + 5UL) * 1000UL;
     s_lastRead = millis() - intervalMs + readDelayMs;
-    logMessage("Sensors enabled (deep sleep — read in " + String(onTimeSec + 5) + "s)", "info");
+    logMessageFmt("info", "Sensors enabled (deep sleep — read in %ds)", onTimeSec + 5);
 }
 
 void sensorsReinit() {
@@ -235,7 +231,7 @@ void sensorsReinit() {
 static void reinitSwitchedSensors() {
     for (uint8_t i = 0; i < sensorCount; i++) {
         if (sensors[i] && s_switched[i]) {
-            logMessage(String(sensors[i]->type()) + ": reinit after power-on", "debug");
+            logMessageFmt("debug", "%s: reinit after power-on", sensors[i]->type());
             sensors[i]->begin(hwCfg.i2c_sda, hwCfg.i2c_scl,
                               hwCfg.uart_rx,  hwCfg.uart_tx,
                               hwCfg.onewire);
@@ -281,7 +277,7 @@ static void doSensorRead() {
         if (!hasData) firstMsgType = r.msgType;
         first   = false;
         hasData = true;
-        logMessage(String(sensors[i]->type()) + ": " + r.data, "debug");
+        logMessageFmt("debug", "%s: %s", sensors[i]->type(), r.data);
     }
 
     size_t mlen = strlen(merged);
@@ -301,7 +297,7 @@ static void doSensorRead() {
     strncpy(combined.data, merged, sizeof(combined.data) - 1);
 
     if (xQueueSend(sensorQueue, &combined, pdMS_TO_TICKS(100)) != pdTRUE)
-        logMessage("sensorQueue full — dropping reading", "warn");
+        logMessage("warn", "sensorQueue full — dropping reading");
 }
 
 static void tickAllSensors(uint32_t nextReadMs) {

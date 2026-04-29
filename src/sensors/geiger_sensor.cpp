@@ -17,7 +17,7 @@ static void GEIGER_ISR_ATTR geigerISR() {
 bool GeigerSensor::begin(int, int, int, int, int) {
     _ready = false;
     if (_pin < 0) {
-        logMessage("Geiger: GPIO pin not configured", "warn");
+        logMessage("warn", "Geiger: GPIO pin not configured");
         return false;
     }
     s_pulseCount = 0;
@@ -25,7 +25,7 @@ bool GeigerSensor::begin(int, int, int, int, int) {
     attachInterrupt(digitalPinToInterrupt(_pin), geigerISR, FALLING);
     _lastReadMs = millis();
     _ready = true;
-    logMessage("Geiger counter on GPIO" + String(_pin), "info");
+    logMessageFmt("info", "Geiger counter on GPIO%d", _pin);
     return true;
 }
 
@@ -45,7 +45,7 @@ bool GeigerSensor::read(SensorReading& r) {
 
     float cpm = (float)count / ((float)elapsed / 60000.0f);
 
-    logMessage("Geiger: count=" + String(count) + " elapsed=" + String(elapsed / 1000) + "s CPM=" + String(cpm, 1), "debug");
+    logMessageFmt("debug", "Geiger: count=%d elapsed=%ds CPM=%.1f", count, elapsed / 1000, cpm);
 
     r.msgType = msgType();
     snprintf(r.data, sizeof(r.data), "{\"Count\":%.1f}", cpm);

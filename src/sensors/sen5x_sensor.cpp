@@ -11,14 +11,14 @@ bool Sen5xSensor::begin(int, int, int, int, int) {
 
     uint16_t err = _sen5x.deviceReset();
     if (err) {
-        logMessage("SEN5x: reset error " + String(err), "warn");
+        logMessageFmt("warn", "SEN5x: reset error %d", err);
         return false;
     }
     delay(1200);  // SEN5x needs ~1 s after reset before accepting commands
 
     err = _sen5x.startMeasurement();
     if (err) {
-        logMessage("SEN5x: startMeasurement error " + String(err), "warn");
+        logMessageFmt("warn", "SEN5x: startMeasurement error %d", err);
         return false;
     }
 
@@ -29,8 +29,7 @@ bool Sen5xSensor::begin(int, int, int, int, int) {
                strstr((char*)name, "55")    != nullptr);
 
     _ready = true;
-    logMessage(String("SEN5x OK (") + (char*)name + ") @ 0x69" +
-               (_hasNox ? " NOx=yes" : " NOx=no"), "info");
+    logMessageFmt("info", "SEN5x OK (%s) @ 0x69%s", (char*)name, _hasNox ? " NOx=yes" : " NOx=no");
     return true;
 }
 
@@ -45,7 +44,7 @@ bool Sen5xSensor::read(SensorReading& r) {
     err = _sen5x.readMeasuredValues(pm1p0, pm2p5, pm4p0, pm10p0,
                                     hum, temp, voc, nox);
     if (err) {
-        logMessage("SEN5x read error " + String(err), "warn");
+        logMessageFmt("warn", "SEN5x read error %d", err);
         return false;
     }
 

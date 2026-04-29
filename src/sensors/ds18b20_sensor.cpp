@@ -9,7 +9,7 @@ static DallasTemperature dt;
 bool Ds18b20Sensor::begin(int, int, int, int, int onewire_pin) {
     _ready = false;
     if (onewire_pin < 0) {
-        logMessage("DS18B20: no 1-Wire pin configured", "warn");
+        logMessage("warn", "DS18B20: no 1-Wire pin configured");
         return false;
     }
     _pin = onewire_pin;
@@ -18,11 +18,11 @@ bool Ds18b20Sensor::begin(int, int, int, int, int onewire_pin) {
     dt.setOneWire(ow);
     dt.begin();
     if (dt.getDeviceCount() == 0) {
-        logMessage("DS18B20: no devices on pin " + String(_pin), "warn");
+        logMessageFmt("warn", "DS18B20: no devices on pin %d", _pin);
         return false;
     }
     _ready = true;
-    logMessage("DS18B20 OK (" + String(dt.getDeviceCount()) + " device(s) on pin " + String(_pin) + ")", "info");
+    logMessageFmt("info", "DS18B20 OK (%d device(s) on pin %d)", dt.getDeviceCount(), _pin);
     return true;
 }
 
@@ -34,7 +34,7 @@ bool Ds18b20Sensor::read(SensorReading& r) {
     dt.requestTemperatures();
     float temp = dt.getTempCByIndex(0);
     if (temp == DEVICE_DISCONNECTED_C) {
-        logMessage("DS18B20 disconnected", "warn");
+        logMessage("warn", "DS18B20 disconnected");
         return false;
     }
 
