@@ -6,6 +6,11 @@
 #include <WebSocketsServer.h>
 #include <cstdarg>
 #include <cstdio>
+#ifdef ESP32
+#include <LittleFS.h>
+#elif defined(ESP8266)
+#include <LittleFS.h>
+#endif
 
 static WebSocketsServer wsServer(81);
 static bool wsStarted = false;
@@ -133,6 +138,112 @@ static void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t lengt
                 }
             }
             xSemaphoreGive(ringMutex);
+        }
+    } else if (type == WStype_TEXT) {
+        // Handle file system commands from WebSocket
+        JsonDocument doc;
+        if (deserializeJson(doc, payload, length)) return;
+        
+        const char* cmd = doc["cmd"];
+        if (strcmp(cmd, "listFiles") == 0) {
+            JsonDocument resp;
+            resp["cmd"] = "fileList";
+            JsonArray files = resp["files"].to<JsonArray>();
+            
+            File root = LittleFS.open("/");
+            File file = root.openNextFile();
+            while(file) {
+                if (!file.isDirectory()) {
+                    files.add(file.name());
+                }
+                file = root.openNextFile();
+            }
+            file.close();
+            root.close();
+            
+            String out;
+            serializeJson(resp, out);
+            wsServer.sendTXT(num, out);
+        } else if (strcmp(cmd, "readFile") == 0) {
+            const char* filename = doc["name"];
+            JsonDocument resp;
+            resp["cmd"] = "fileContent";
+            resp["name"] = filename ? filename : "";
+            
+            if (filename) {
+                String fullPath = String("/") + String(filename);
+                File f = LittleFS.open(fullPath.c_str(), "r");
+                if (f && !f.isDirectory()) {
+                    String content = "";
+                    while (f.available()) {
+                        content += (char)f.read();
+                    }
+                    resp["content"] = content;
+                } else {
+                    resp["content"] = "File not found or is a directory";
+                }
+                if (f) f.close();
+            } else {
+                resp["content"] = "No filename provided";
+            }
+            
+            String out;
+            serializeJson(resp, out);
+            wsServer.sendTXT(num, out);
+        } else if (strcmp(cmd, "saveFile") == 0) {
+            const char* filename = doc["name"];
+            const char* content = doc["content"];
+            JsonDocument resp;
+            resp["cmd"] = "fileSaved";
+            
+            if (filename && content) {
+                String fullPath = String("/") + String(filename);
+                File f = LittleFS.open(fullPath.c_str(), "w");
+                if (f) {
+                    f.print(content);
+                    f.close();
+                    resp["ok"] = true;
+                } else {
+                    resp["ok"] = false;
+                    resp["error"] = "Failed to create file";
+                }
+            } else {
+                resp["ok"] = false;
+                resp["error"] = "No filename or content provided";
+            }
+            
+            String out;
+            serializeJson(resp, out);
+            wsServer.sendTXT(num, out);
+        } else if (strcmp(cmd, "downloadFile") == 0) {
+            const char* filename = doc["name"];
+            JsonDocument resp;
+            resp["cmd"] = "downloadFile";
+            resp["name"] = filename ? filename : "";
+            
+            if (filename) {
+                String fullPath = String("/") + String(filename);
+                File f = LittleFS.open(fullPath.c_str(), "r");
+                if (f && !f.isDirectory()) {
+                    String content = "";
+                    while (f.available()) {
+                        content += (char)f.read();
+                    }
+                    resp["content"] = content;
+                    resp["ok"] = true;
+                } else {
+                    resp["ok"] = false;
+                    resp["error"] = "File not found or is a directory";
+                }
+                if (f) f.close();
+            } else {
+                resp["ok"] = false;
+                resp["error"] = "No filename provided";
+            }
+            
+            String out;
+            serializeJson(resp, out);
+            wsServer.sendTXT(num, out);
         }
     }
 }

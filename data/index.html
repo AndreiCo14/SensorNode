@@ -358,6 +358,26 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
     <div class="sublabel" style="margin-bottom:8px">I2C Scanner</div>
     <button class="btn" onclick="runI2cScan()">Scan I2C Bus</button>
     <div id="i2c-result" style="margin-top:8px;font-size:12px;min-height:20px"></div>
+    <div class="cmd-divider">
+      <div class="sublabel" style="margin-bottom:6px">File System</div>
+      <div class="btn-row">
+        <button class="btn" onclick="wsListFiles()">List Files</button>
+      </div>
+      <div class="form-row" style="margin-top:6px">
+        <input type="text" id="file-name-input" placeholder="filename.txt" style="flex:1;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:2px">
+        <button class="btn" onclick="wsReadFile()">Read File</button>
+      </div>
+      <div class="form-row" style="margin-top:6px">
+        <input type="text" id="file-save-name" placeholder="filename.txt" style="flex:1;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:2px">
+        <button class="btn" onclick="wsSaveFile()">Save File</button>
+      </div>
+      <div class="form-row" style="margin-top:6px">
+        <textarea id="file-content-input" placeholder="File content..." style="min-height:60px;resize:vertical"></textarea>
+      </div>
+      <div class="btn-row" style="margin-top:6px">
+        <button class="btn" onclick="wsDownloadFile()">Download File</button>
+      </div>
+    </div>
   </section>
 
   <!-- Features -->
@@ -930,6 +950,70 @@ function runI2cScan() {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+// WebSocket file system functions
+var s_wsForFiles = null;
+function getWsForFiles() {
+  if (!s_wsForFiles || s_wsForFiles.readyState !== WebSocket.OPEN) {
+    s_wsForFiles = new WebSocket('ws://'+location.hostname+':81');
+  }
+  return s_wsForFiles;
+}
+
+function wsListFiles() {
+  var ws = getWsForFiles();
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({cmd:'listFiles'}));
+  } else {
+    var el = document.getElementById('i2c-result');
+    if (el) el.innerHTML = '<span class="err">WebSocket not connected</span>';
+  }
+}
+
+function wsReadFile() {
+  var name = document.getElementById('file-name-input').value.trim();
+  if (!name) {
+    showToast('Enter a filename');
+    return;
+  }
+  var ws = getWsForFiles();
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({cmd:'readFile', name:name}));
+  } else {
+    showToast('WebSocket not connected');
+  }
+}
+
+function wsSaveFile() {
+  var name = document.getElementById('file-save-name').value.trim();
+  var content = document.getElementById('file-content-input').value;
+  if (!name) {
+    showToast('Enter a filename');
+    return;
+  }
+  var ws = getWsForFiles();
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({cmd:'saveFile', name:name, content:content}));
+    showToast('File saved');
+  } else {
+    showToast('WebSocket not connected');
+  }
+}
+
+function wsDownloadFile() {
+  var name = document.getElementById('file-name-input').value.trim();
+  if (!name) {
+    showToast('Enter a filename to download');
+    return;
+  }
+  var ws = getWsForFiles();
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({cmd:'downloadFile', name:name}));
+  } else {
+    showToast('WebSocket not connected');
+  }
+}
+
 function postJson(url, body, msgId) {
   fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(function(r){return r.json()})
@@ -979,6 +1063,52 @@ function connectWs() {
       prog.value = pct;
       if (pct >= 100) setTimeout(function(){ prog.style.display='none'; }, 2000);
       d = {t: d.t, m: 'OTA: ' + pct + '%', l: 'info'};
+    }
+    // Handle file list response
+    if (d.cmd === 'fileList') {
+      var el = document.getElementById('i2c-result');
+      if (el) {
+        if (d.files && d.files.length > 0) {
+          el.innerHTML = d.files.map(function(f){ return '<span class="i2c-addr">'+escHtml(f)+'</span>'; }).join('');
+        } else {
+          el.innerHTML = '<span class="hint-text">No files found</span>';
+        }
+      }
+      return;
+    }
+    // Handle file content response
+    if (d.cmd === 'fileContent') {
+      var log = document.getElementById('log');
+      var row = document.createElement('div');
+      row.className = 'log-entry log-info';
+      row.innerHTML = '<span class="log-ts">FILE:</span> ' + escHtml(d.name||'') + '<br>' + escHtml(d.content||'');
+      log.appendChild(row);
+      while(log.children.length>MAX_LOG) log.removeChild(log.firstChild);
+      log.scrollTop = log.scrollHeight;
+      return;
+    }
+    // Handle file saved confirmation
+    if (d.cmd === 'fileSaved') {
+      var msg = d.ok ? 'File saved successfully' : ('Error: ' + (d.error || 'unknown'));
+      showToast(msg);
+      return;
+    }
+    // Handle file download response
+    if (d.cmd === 'downloadFile') {
+      if (d.ok && d.content) {
+        var blob = new Blob([d.content], {type: 'text/plain'});
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = d.name || 'file.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        showToast('Error downloading file: ' + (d.error || 'unknown'));
+      }
+      return;
     }
     // Handle toggle state broadcast from handleCommand
     if (d.hasOwnProperty('maintenance') || d.hasOwnProperty('deepSleep') || d.hasOwnProperty('debugLog') || d.hasOwnProperty('ignoreCmd') || d.hasOwnProperty('teleIntervalM') || d.hasOwnProperty('onTime')) {
