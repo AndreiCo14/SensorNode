@@ -2,11 +2,7 @@
 #include "../logger.h"
 #include <Arduino.h>
 
-#ifdef ESP8266
-#  define GEIGER_ISR_ATTR ICACHE_RAM_ATTR
-#else
-#  define GEIGER_ISR_ATTR IRAM_ATTR
-#endif
+#define GEIGER_ISR_ATTR IRAM_ATTR
 
 static volatile uint32_t s_pulseCount = 0;
 
