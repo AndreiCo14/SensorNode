@@ -19,7 +19,7 @@ void broadcast_deepSleep(bool deepSleep);
 void broadcast_ignoreCmd(bool ignoreCmd);
 void broadcastTeleInterval(uint16_t teleIntervalM);
 void broadcastOnTime(uint16_t onTimeSec);
-void broadcastFsList(const String& json);
+void broadcastFsList(String& json);
 void broadcastFsContent(const String& content);
 
 #ifdef ESP8266

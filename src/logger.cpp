@@ -69,7 +69,7 @@ void broadcastOnTime(uint16_t onTimeSec) {
     wsServer.broadcastTXT(out);
 }
 
-void broadcastFsList(const String& json) {
+void broadcastFsList(String& json) {
     if (!wsStarted) return;
     wsServer.broadcastTXT(json);
 }
