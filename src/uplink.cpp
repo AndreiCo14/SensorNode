@@ -470,21 +470,20 @@ static void handleProvisioningConfig(const char* payload) {
     hw.provisioned = true;
     saveHwConfig(hw);
     if (hwChanged) {
-        String hwLog = "Provision: hwconfig applied —";
-        if (!doc["teleIntervalM"].isNull()) hwLog += " teleIntervalM=" + String(hw.teleIntervalM);
-        if (!doc["sampleNum"].isNull())     hwLog += " sampleNum=" + String(hw.sampleNum);
-        if (!doc["onTime"].isNull())        hwLog += " onTime=" + String(hw.onTime);
-        if (!doc["interval"].isNull())      hwLog += " interval=" + String(hw.intervalSec);
-        if (!doc["i2c_sda"].isNull())       hwLog += " sda=" + String(hw.i2c_sda);
-        if (!doc["i2c_scl"].isNull())       hwLog += " scl=" + String(hw.i2c_scl);
-        if (!doc["uart_rx"].isNull())       hwLog += " rx=" + String(hw.uart_rx);
-        if (!doc["uart_tx"].isNull())       hwLog += " tx=" + String(hw.uart_tx);
-        if (!doc["onewire"].isNull())       hwLog += " ow=" + String(hw.onewire);
-        if (!doc["led_pin"].isNull())       hwLog += " led=" + String(hw.led_pin);
-        if (!doc["5v_pin"].isNull())        hwLog += " 5v=" + String(hw.pin5v);
+        logMessage("info", "Provision: hwconfig applied:");
+        if (!doc["teleIntervalM"].isNull()) logMessageFmt("=", "teleIntervalM=%d", hw.teleIntervalM);
+        if (!doc["sampleNum"].isNull())     logMessageFmt("=", "sampleNum=%d", hw.sampleNum);
+        if (!doc["onTime"].isNull())        logMessageFmt("=", "onTime=%d", hw.onTime);
+        if (!doc["interval"].isNull())      logMessageFmt("=", "interval=%d", hw.intervalSec);
+        if (!doc["i2c_sda"].isNull())       logMessageFmt("=", "sda=%d", hw.i2c_sda);
+        if (!doc["i2c_scl"].isNull())       logMessageFmt("=", "scl=%d", hw.i2c_scl);
+        if (!doc["uart_rx"].isNull())       logMessageFmt("=", "rx=%d", hw.uart_rx);
+        if (!doc["uart_tx"].isNull())       logMessageFmt("=", "tx=%d", hw.uart_tx);
+        if (!doc["onewire"].isNull())       logMessageFmt("=", "ow=%d", hw.onewire);
+        if (!doc["led_pin"].isNull())       logMessageFmt("=", "led=%d", hw.led_pin);
+        if (!doc["5v_pin"].isNull())        logMessageFmt("=", "5v=%d", hw.pin5v);
         for (uint8_t i = 0; i < hw.gpio_count; i++)
-            if (hw.gpio_pin[i] >= 0) hwLog += " gpio" + String(hw.gpio_pin[i]) + "=" + hw.gpio_mode[i];
-        logMessageFmt("info", "%s", hwLog.c_str());
+            if (hw.gpio_pin[i] >= 0) logMessageFmt("=", "gpio%d=%s", hw.gpio_pin[i], hw.gpio_mode[i]);
     } else {
         logMessage("info", "Provision: no hw fields changed, provisioned flag set");
     }
