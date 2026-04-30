@@ -464,6 +464,18 @@ All `settings.h` constants can be overridden via `build_flags` in `platformio.in
 
 Config files survive OTA updates (they are in the data partition, separate from firmware). Factory Reset from the web UI selectively removes them.
 
+### Web UI development
+
+`data/index.html` is the source for the web interface. It is **not** served from LittleFS — instead it is gzip-compressed and embedded as a PROGMEM byte array in `src/index_html.h`, which is what the webserver actually serves.
+
+After editing `data/index.html`, regenerate the header:
+
+```bash
+python3 scripts/gen_html.py
+```
+
+Then rebuild and upload the firmware. No filesystem upload is needed for UI changes.
+
 ### Re-flashing from scratch
 
 If the device is completely unresponsive or the filesystem is corrupt, flash via serial:

@@ -8,7 +8,6 @@
 #include "system_state.h"
 #include "platform.h"
 #include "queues.h"
-//#include "uplink.h"
 #include "index_html.h"
 #include "favicon_ico.h"
 #include <LittleFS.h>
@@ -136,7 +135,7 @@ static void handlePostWifi() {
     const char* pass  = doc["pass"]  | "";
     const char* ssid2 = doc["ssid2"] | "";
     const char* pass2 = doc["pass2"] | "";
-    if (strlen(ssid) == 0) { sendJson(400, "{\"error\":\"ssid required\"}"); return; }
+    if (strlen(ssid) == 0 && strlen(ssid2) == 0) { sendJson(400, "{\"error\":\"At least one SSID required\"}"); return; }
     if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
 
     // If a password field is empty, preserve the existing stored password for
@@ -184,6 +183,11 @@ static void handleGetMqttConfig() {
     doc["prefix"]          = cfg.prefix;
     doc["tls"]             = cfg.tls;
     doc["reconnIntervalS"] = cfg.reconnIntervalS;
+#ifdef BOARD_ESP8266
+    doc["tls_supported"]   = false;
+#else
+    doc["tls_supported"]   = true;
+#endif
     sendJsonDoc(200, doc);
 }
 
@@ -337,9 +341,15 @@ static void handlePostSensorSetup() {
     if (!httpServer.hasArg("plain")) { sendJson(400, "{\"error\":\"no body\"}"); return; }
     if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
     if (xSemaphoreTake(sensorSetupMutex, pdMS_TO_TICKS(1000))) {
-        DeserializationError err = deserializeJson(sensorSetupData, httpServer.arg("plain"));
+        JsonDocument incoming;
+        DeserializationError err = deserializeJson(incoming, httpServer.arg("plain"));
+        if (err) { xSemaphoreGive(sensorSetupMutex); sendJson(400, "{\"error\":\"invalid JSON\"}"); return; }
+        // Store only enabled sensors — disabled entries are reconstructed from defaults by the UI
+        sensorSetupData.clear();
+        JsonArray dst = sensorSetupData.to<JsonArray>();
+        for (JsonObject entry : incoming.as<JsonArray>())
+            if (entry["enabled"] | false) dst.add(entry);
         xSemaphoreGive(sensorSetupMutex);
-        if (err) { sendJson(400, "{\"error\":\"invalid JSON\"}"); return; }
         if (!saveSensorSetup()) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
         sendJson(200, "{\"ok\":true}");
         logMessage("info", "Sensor setup updated via web");
