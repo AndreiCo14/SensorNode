@@ -365,6 +365,11 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
       <input type="text" id="fs-filename" placeholder="filename.txt" style="flex:1">
       <button class="btn" onclick="readFile()">Read File</button>
     </div>
+    <div class="btn-row" style="margin-top:8px">
+      <button class="btn" onclick="saveFile()">Save File</button>
+      <button class="btn" onclick="document.getElementById('fs-fileinput').click()">Load File</button>
+      <input type="file" id="fs-fileinput" style="display:none" onchange="uploadFile(this)">
+    </div>
     <div id="fs-result" style="margin-top:8px;font-size:12px;min-height:20px;white-space:pre-wrap"></div>
   </section>
 
@@ -951,6 +956,47 @@ function readFile() {
   el.textContent = 'Reading...';
   fetch('/api/fs?file=' + encodeURIComponent(name))
     .catch(function(e){el.textContent='Error: '+e.message;});
+}
+
+function saveFile() {
+  var name = document.getElementById('fs-filename').value.trim();
+  var el = document.getElementById('fs-result');
+  if (!name) { el.textContent = 'Enter a filename'; return; }
+  var content = el.textContent || '';
+  if (!content || content === 'Loading...' || content === 'Reading...' || content.startsWith('Error:') || content.startsWith('Failed')) {
+    el.textContent = 'No content to save. Read or enter content first.';
+    return;
+  }
+  fetch('/api/fs?file=' + encodeURIComponent(name), {
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain'},
+    body: content
+  })
+    .then(function(r){return r.json()})
+    .then(function(d){el.textContent = d.ok ? 'Saved: ' + name : ('Error: ' + d.error);})
+    .catch(function(e){el.textContent='Error: '+e.message;});
+}
+
+function uploadFile(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var name = document.getElementById('fs-filename').value.trim() || file.name;
+  var el = document.getElementById('fs-result');
+  el.textContent = 'Uploading ' + file.name + '...';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var content = e.target.result;
+    fetch('/api/fs?file=' + encodeURIComponent(name), {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'},
+      body: content
+    })
+      .then(function(r){return r.json()})
+      .then(function(d){el.textContent = d.ok ? 'Uploaded: ' + name : ('Error: ' + d.error);})
+      .catch(function(err){el.textContent='Error: '+err.message;});
+  };
+  reader.readAsText(file);
+  input.value = '';
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
