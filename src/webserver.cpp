@@ -569,7 +569,8 @@ static void handlePostFs() {
     file.close();
     
     if (written == content.length()) {
-        logMessage("Saved file: " + filename, "info");
+        String msg = "Saved file: " + filename;
+        logMessage("info", msg.c_str());
         sendJson(200, "{\"ok\":true,\"msg\":\"Saved\"}");
     } else {
         sendJson(500, "{\"error\":\"Write error\"}");
