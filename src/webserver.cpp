@@ -555,6 +555,45 @@ static void handleGetFs() {
     sendJsonDoc(200, doc);
 }
 
+// ─── POST /api/fs (save file) ─────────────────────────────────────────────────
+
+static void handlePostFs() {
+    String filename = httpServer.arg("file");
+
+    if (filename.length() == 0) {
+        sendJson(400, "{\"ok\":false,\"error\":\"No filename provided\"}");
+        return;
+    }
+
+    if (!lfsReady) {
+        sendJson(503, "{\"ok\":false,\"error\":\"File system not mounted\"}");
+        return;
+    }
+
+    String fullPath = filename;
+    if (!fullPath.startsWith("/")) {
+        fullPath = "/" + fullPath;
+    }
+
+    String content = httpServer.arg("plain");
+
+    File file = LittleFS.open(fullPath, "w");
+    if (!file) {
+        sendJson(500, "{\"ok\":false,\"error\":\"Failed to open file for writing\"}");
+        return;
+    }
+
+    size_t written = file.print(content);
+    file.close();
+
+    if (written == 0 && content.length() > 0) {
+        sendJson(500, "{\"ok\":false,\"error\":\"Failed to write content\"}");
+        return;
+    }
+
+    sendJson(200, "{\"ok\":true,\"msg\":\"Saved \" + filename + \" (\" + String(written) + \" bytes)\"}");
+}
+
 // ─── GET /api/utils/i2c-scan ─────────────────────────────────────────────────
 
 static void handleI2cScan() {
@@ -688,6 +727,7 @@ static void webServerSetup() {
     httpServer.on("/api/state",      HTTP_GET,  handleGetState);
     httpServer.on("/api/cmd",        HTTP_POST, handlePostCmd);
     httpServer.on("/api/fs",         HTTP_GET,  handleGetFs);
+    httpServer.on("/api/fs",         HTTP_POST, handlePostFs);
     httpServer.on("/api/ota",         HTTP_POST, handleOtaResponse, handleOtaUpload);
     httpServer.on("/api/ota/version", HTTP_GET,  handleGetOtaVersion);
 
