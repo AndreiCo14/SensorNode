@@ -565,42 +565,24 @@ static void handlePostFs() {
     
     // Читаем тело запроса потоком для поддержки больших файлов
     WiFiClient& client = httpServer.client();
-    size_t contentLength = 0;
-    String clHeader = httpServer.header("Content-Length");
-    if (clHeader.length() > 0) {
-        contentLength = clHeader.toInt();
-    }
-    
+    size_t contentLength = httpServer.contentLength();
     size_t written = 0;
     const size_t bufferSize = 256;
     char buffer[bufferSize];
     
-    // Если известна длина контента, читаем ровно столько байт
-    if (contentLength > 0) {
-        while (contentLength > 0) {
-            size_t toRead = (contentLength > bufferSize) ? bufferSize : contentLength;
-            size_t bytesRead = client.read((uint8_t*)buffer, toRead);
-            if (bytesRead == 0) break;
-            file.write((uint8_t*)buffer, bytesRead);
-            written += bytesRead;
-            contentLength -= bytesRead;
-        }
-    } else {
-        // Если длина неизвестна, читаем пока есть данные
-        while (client.connected() || client.available()) {
-            size_t bytesRead = client.read((uint8_t*)buffer, bufferSize);
-            if (bytesRead == 0 && !client.connected()) break;
-            if (bytesRead > 0) {
-                file.write((uint8_t*)buffer, bytesRead);
-                written += bytesRead;
-            }
-        }
+    while (contentLength > 0) {
+        size_t toRead = (contentLength > bufferSize) ? bufferSize : contentLength;
+        size_t bytesRead = client.read((uint8_t*)buffer, toRead);
+        if (bytesRead == 0) break;
+        file.write((uint8_t*)buffer, bytesRead);
+        written += bytesRead;
+        contentLength -= bytesRead;
     }
     file.close();
     
     String msg = "Saved file: " + filename + " (" + String(written) + " bytes)";
     logMessage("info", msg.c_str());
-    sendJson(200, "{\"ok\":true,\"msg\":\"Saved\",\"bytes\":" + String(written) + "}");
+    sendJson(200, "{\"ok\":true,\"msg\":\"Saved\",\"bytes\":}" + String(written) + "}");
 }
 
 // ─── GET /api/utils/i2c-scan ─────────────────────────────────────────────────
