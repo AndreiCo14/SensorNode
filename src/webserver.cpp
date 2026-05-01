@@ -538,6 +538,44 @@ static void handleGetFs() {
     sendJsonDoc(200, doc);
 }
 
+// ─── POST /api/fs ──────────────────────────────────────────────────────────────
+
+static void handlePostFs() {
+    if (!lfsReady) {
+        sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}");
+        return;
+    }
+    
+    String filename = httpServer.arg("file");
+    if (filename.length() == 0) {
+        sendJson(400, "{\"error\":\"Missing file parameter\"}");
+        return;
+    }
+    
+    String fullPath = filename;
+    if (!fullPath.startsWith("/")) {
+        fullPath = "/" + fullPath;
+    }
+    
+    String content = httpServer.arg("plain");
+    
+    File file = LittleFS.open(fullPath, "w");
+    if (!file) {
+        sendJson(500, "{\"error\":\"Failed to create file\"}");
+        return;
+    }
+    
+    size_t written = file.print(content);
+    file.close();
+    
+    if (written == content.length()) {
+        logMessage("Saved file: " + filename, "info");
+        sendJson(200, "{\"ok\":true,\"msg\":\"Saved\"}");
+    } else {
+        sendJson(500, "{\"error\":\"Write error\"}");
+    }
+}
+
 // ─── GET /api/utils/i2c-scan ─────────────────────────────────────────────────
 
 static void handleI2cScan() {
@@ -671,6 +709,7 @@ static void webServerSetup() {
     httpServer.on("/api/state",      HTTP_GET,  handleGetState);
     httpServer.on("/api/cmd",        HTTP_POST, handlePostCmd);
     httpServer.on("/api/fs",         HTTP_GET,  handleGetFs);
+    httpServer.on("/api/fs",         HTTP_POST, handlePostFs);
     httpServer.on("/api/ota",         HTTP_POST, handleOtaResponse, handleOtaUpload);
     httpServer.on("/api/ota/version", HTTP_GET,  handleGetOtaVersion);
 
