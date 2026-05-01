@@ -359,13 +359,14 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
     <div id="i2c-result" style="margin-top:8px;font-size:12px;min-height:20px"></div>
     <div class="cmd-divider"></div>
     <div class="sublabel" style="margin:8px 0">File System</div>
-    <button class="btn" onclick="listFiles()">List Files</button>
     <div class="form-row" style="margin-top:8px">
+      <button class="btn" onclick="listFiles()">List Files</button>
       <input type="text" id="fs-filename" placeholder="filename.txt" style="flex:1">
       <button class="btn" onclick="readFile()">Read File</button>
       <button class="btn" onclick="saveFile()">Save File</button>
+      <button class="btn" onclick="deleteFile()" style="background:#dc3545">Delete File</button>
     </div>
-    <textarea id="fs-result" style="margin-top:8px;font-size:12px;min-height:120px;white-space:pre-wrap;font-family:monospace;resize:vertical"></textarea>
+    <textarea id="fs-result" spellcheck="false" style="margin-top:8px;font-size:12px;min-height:48px;white-space:pre-wrap;font-family:monospace;resize:vertical"></textarea>
   </section>
 
   <!-- Features -->
@@ -980,6 +981,23 @@ function saveFile() {
       }
     })
     .catch(function(e){el.value='Save failed: '+e.message;});
+}
+
+function deleteFile() {
+  var name = document.getElementById('fs-filename').value.trim();
+  var el = document.getElementById('fs-result');
+  if (!name) { el.value = 'Enter a filename'; return; }
+  if (!confirm('Delete file: ' + name + '?')) { return; }
+  el.value = 'Deleting...';
+  fetch('/api/fs?file=' + encodeURIComponent(name), {
+    method: 'DELETE'
+  })
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) { el.value = 'Deleted: ' + name; }
+      else { el.value = 'Error: ' + d.error; }
+    })
+    .catch(function(e){el.value='Delete failed: '+e.message;});
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

@@ -594,6 +594,40 @@ static void handlePostFs() {
     sendJson(200, "{\"ok\":true,\"msg\":\"Saved \" + filename + \" (\" + String(written) + \" bytes)\"}");
 }
 
+// ─── DELETE /api/fs (delete file) ─────────────────────────────────────────────
+
+static void handleDeleteFs() {
+    String filename = httpServer.arg("file");
+
+    if (filename.length() == 0) {
+        sendJson(400, "{\"ok\":false,\"error\":\"No filename provided\"}");
+        return;
+    }
+
+    if (!lfsReady) {
+        sendJson(503, "{\"ok\":false,\"error\":\"File system not mounted\"}");
+        return;
+    }
+
+    String fullPath = filename;
+    if (!fullPath.startsWith("/")) {
+        fullPath = "/" + fullPath;
+    }
+
+    if (!LittleFS.exists(fullPath)) {
+        sendJson(404, "{\"ok\":false,\"error\":\"File not found: " + filename + "\"}");
+        return;
+    }
+
+    if (!LittleFS.remove(fullPath)) {
+        sendJson(500, "{\"ok\":false,\"error\":\"Failed to delete file\"}");
+        return;
+    }
+
+    String resp = "{\"ok\":true,\"msg\":\"Deleted " + filename + "\"}";
+    sendJson(200, resp);
+}
+
 // ─── GET /api/utils/i2c-scan ─────────────────────────────────────────────────
 
 static void handleI2cScan() {
@@ -728,6 +762,7 @@ static void webServerSetup() {
     httpServer.on("/api/cmd",        HTTP_POST, handlePostCmd);
     httpServer.on("/api/fs",         HTTP_GET,  handleGetFs);
     httpServer.on("/api/fs",         HTTP_POST, handlePostFs);
+    httpServer.on("/api/fs",         HTTP_DELETE, handleDeleteFs);
     httpServer.on("/api/ota",         HTTP_POST, handleOtaResponse, handleOtaUpload);
     httpServer.on("/api/ota/version", HTTP_GET,  handleGetOtaVersion);
 
