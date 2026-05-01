@@ -557,24 +557,32 @@ static void handlePostFs() {
         fullPath = "/" + fullPath;
     }
     
-    String content = httpServer.arg("plain");
-    
     File file = LittleFS.open(fullPath, "w");
     if (!file) {
         sendJson(500, "{\"error\":\"Failed to create file\"}");
         return;
     }
     
-    size_t written = file.print(content);
+    // Читаем тело запроса потоком для поддержки больших файлов
+    WiFiClient& client = httpServer.client();
+    size_t contentLength = httpServer.contentLength();
+    size_t written = 0;
+    const size_t bufferSize = 256;
+    char buffer[bufferSize];
+    
+    while (contentLength > 0) {
+        size_t toRead = (contentLength > bufferSize) ? bufferSize : contentLength;
+        size_t bytesRead = client.read((uint8_t*)buffer, toRead);
+        if (bytesRead == 0) break;
+        file.write((uint8_t*)buffer, bytesRead);
+        written += bytesRead;
+        contentLength -= bytesRead;
+    }
     file.close();
     
-    if (written == content.length()) {
-        String msg = "Saved file: " + filename;
-        logMessage("info", msg.c_str());
-        sendJson(200, "{\"ok\":true,\"msg\":\"Saved\"}");
-    } else {
-        sendJson(500, "{\"error\":\"Write error\"}");
-    }
+    String msg = "Saved file: " + filename + " (" + String(written) + " bytes)";
+    logMessage("info", msg.c_str());
+    sendJson(200, "{\"ok\":true,\"msg\":\"Saved\",\"bytes\":}" + String(written) + "}");
 }
 
 // ─── GET /api/utils/i2c-scan ─────────────────────────────────────────────────
