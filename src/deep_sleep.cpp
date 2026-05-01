@@ -10,7 +10,7 @@
 #endif
 
 void enterDeepSleep(uint32_t seconds) {
-    logMessage("Deep sleep: " + String(seconds) + "s", "info");
+    logMessageFmt("info", "Deep sleep: %ds", seconds);
 
 #ifdef ESP8266
     // Flush log queue before blocking

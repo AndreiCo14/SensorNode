@@ -14,11 +14,11 @@ bool Bme280Sensor::begin(int i2c_sda, int i2c_scl, int, int, int) {
 #endif
     bme.setI2CAddress(_addr);
     if (!bme.beginI2C(Wire)) {
-        logMessage("BME280 not found at 0x" + String(_addr, HEX), "warn");
+        logMessageFmt("warn", "BME280 not found at 0x%X", _addr);
         return false;
     }
     _ready = true;
-    logMessage("BME280 OK (0x" + String(_addr, HEX) + ")", "info");
+    logMessageFmt("info", "BME280 OK (0x%X)", _addr);
     return true;
 }
 

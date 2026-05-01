@@ -88,7 +88,7 @@ static LogEntry ringBuffer[LOG_RING_SIZE];
 static size_t   ringIndex = 0;
 static SemaphoreHandle_t ringMutex = NULL;
 
-void logMessage(const char* message, const char* level) {
+void logMessage(const char* level, const char* message) {
     if (!logQueue) return;
     if (strcmp(level, "debug") == 0 && !debugLogEnabled) return;
 
@@ -102,9 +102,26 @@ void logMessage(const char* message, const char* level) {
     xQueueSend(logQueue, &entry, 0);
     Serial.printf("[%s] %s\r\n", level, message);
 }
+void logMessageFmt(const char* level, const char* format, ...) {
+    static char buffer[128];
+    
+    va_list args;
+    va_start(args, format);
+    uint16_t needed = vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
 
-void logMessage(const String& message, const char* level) {
-    logMessage(message.c_str(), level);
+    if (needed >= sizeof(buffer)) {
+        if (sizeof(buffer) > 4) {
+            buffer[sizeof(buffer) - 4] = '.';
+            buffer[sizeof(buffer) - 3] = '.';
+            buffer[sizeof(buffer) - 2] = '.';
+            buffer[sizeof(buffer) - 1] = '\0';
+        }
+    } else if (needed < 0) {
+        return;
+    }
+
+    logMessage(level, buffer);
 }
 
 static String serializeEntry(const LogEntry& entry) {

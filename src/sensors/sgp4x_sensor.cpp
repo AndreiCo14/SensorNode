@@ -13,11 +13,11 @@ bool Sgp4xSensor::begin(int, int, int, int, int) {
     uint16_t srawVoc = 0;
     uint16_t err = _sgp.executeConditioning(0x8000, 0x6666, srawVoc);
     if (err) {
-        logMessage("SGP4x: conditioning error " + String(err), "warn");
+        logMessageFmt("warn", "SGP4x: conditioning error %d", err);
         return false;
     }
     _ready = true;
-    logMessage("SGP4x OK (0x59)", "info");
+    logMessage("info", "SGP4x OK (0x59)");
     return true;
 }
 
@@ -41,19 +41,19 @@ bool Sgp4xSensor::read(SensorReading& r) {
         if (!err) {
             if (_mode == MODE_UNKNOWN) {
                 _mode = MODE_SGP41;
-                logMessage("SGP4x: SGP41 detected (VOC+NOx)", "info");
+                logMessage("info", "SGP4x: SGP41 detected (VOC+NOx)");
             }
         } else {
             // measureRawSignals failed — assume SGP40, fall through
             _mode = MODE_SGP40;
-            logMessage("SGP4x: SGP40 detected (VOC only)", "info");
+            logMessage("info", "SGP4x: SGP40 detected (VOC only)");
         }
     }
 
     if (_mode == MODE_SGP40) {
         uint16_t err = _sgp.executeConditioning(compRh, compT, srawVoc);
         if (err) {
-            logMessage("SGP4x read error " + String(err), "warn");
+            logMessageFmt("warn", "SGP4x read error %d", err);
             return false;
         }
     }

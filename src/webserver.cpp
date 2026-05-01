@@ -8,7 +8,6 @@
 #include "system_state.h"
 #include "platform.h"
 #include "queues.h"
-//#include "uplink.h"
 #include "index_html.h"
 #include "favicon_ico.h"
 #include <LittleFS.h>
@@ -136,7 +135,7 @@ static void handlePostWifi() {
     const char* pass  = doc["pass"]  | "";
     const char* ssid2 = doc["ssid2"] | "";
     const char* pass2 = doc["pass2"] | "";
-    if (strlen(ssid) == 0) { sendJson(400, "{\"error\":\"ssid required\"}"); return; }
+    if (strlen(ssid) == 0 && strlen(ssid2) == 0) { sendJson(400, "{\"error\":\"At least one SSID required\"}"); return; }
     if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
 
     // If a password field is empty, preserve the existing stored password for
@@ -148,7 +147,7 @@ static void handlePostWifi() {
     const char* effectivePass2 = (strlen(pass2) == 0 && strcmp(ssid2, curSsid2) == 0) ? curPass2 : pass2;
 
     if (!saveWifiCreds(ssid, effectivePass, ssid2, effectivePass2)) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
-    logMessage(String("WiFi saved: ") + ssid, "info");
+    logMessageFmt("info", "WiFi saved: %s", ssid);
     sendJson(200, "{\"ok\":true,\"msg\":\"Saved.\"}");
 
 }
@@ -184,6 +183,11 @@ static void handleGetMqttConfig() {
     doc["prefix"]          = cfg.prefix;
     doc["tls"]             = cfg.tls;
     doc["reconnIntervalS"] = cfg.reconnIntervalS;
+#ifdef BOARD_ESP8266
+    doc["tls_supported"]   = false;
+#else
+    doc["tls_supported"]   = true;
+#endif
     sendJsonDoc(200, doc);
 }
 
@@ -206,7 +210,7 @@ static void handlePostMqttConfig() {
     if (strlen(cfg.broker) == 0) { sendJson(400, "{\"error\":\"broker required\"}"); return; }
     if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
     if (!saveMqttConfig(cfg)) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
-    logMessage("MQTT config saved", "info");
+    logMessage("info", "MQTT config saved");
     sendJson(200, "{\"ok\":true,\"msg\":\"Saved.\"}");
 
 }
@@ -272,7 +276,7 @@ static void handlePostHwConfig() {
     if (!doc["onTime"].isNull())        cfg.onTime        = doc["onTime"].as<uint16_t>();
     if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
     if (!saveHwConfig(cfg)) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
-    logMessage("HW config saved", "info");
+    logMessage("info", "HW config saved");
     sendJson(200, "{\"ok\":true,\"msg\":\"Saved.\"}");
 
 }
@@ -337,12 +341,18 @@ static void handlePostSensorSetup() {
     if (!httpServer.hasArg("plain")) { sendJson(400, "{\"error\":\"no body\"}"); return; }
     if (!lfsReady) { sendJson(503, "{\"error\":\"Filesystem unavailable — reflash with correct partition table\"}"); return; }
     if (xSemaphoreTake(sensorSetupMutex, pdMS_TO_TICKS(1000))) {
-        DeserializationError err = deserializeJson(sensorSetupData, httpServer.arg("plain"));
+        JsonDocument incoming;
+        DeserializationError err = deserializeJson(incoming, httpServer.arg("plain"));
+        if (err) { xSemaphoreGive(sensorSetupMutex); sendJson(400, "{\"error\":\"invalid JSON\"}"); return; }
+        // Store only enabled sensors — disabled entries are reconstructed from defaults by the UI
+        sensorSetupData.clear();
+        JsonArray dst = sensorSetupData.to<JsonArray>();
+        for (JsonObject entry : incoming.as<JsonArray>())
+            if (entry["enabled"] | false) dst.add(entry);
         xSemaphoreGive(sensorSetupMutex);
-        if (err) { sendJson(400, "{\"error\":\"invalid JSON\"}"); return; }
         if (!saveSensorSetup()) { sendJson(500, "{\"error\":\"Save failed\"}"); return; }
         sendJson(200, "{\"ok\":true}");
-        logMessage("Sensor setup updated via web", "info");
+        logMessage("info", "Sensor setup updated via web");
         sensorsReinit();
     } else {
         sendJson(503, "{\"error\":\"busy\"}");
@@ -432,21 +442,28 @@ static void handleOtaUpload() {
         ledUpdate();  // push cyan to hardware immediately
         otaBeginOk = OTA_BEGIN(upload.contentLength);
         if (otaBeginOk) {
-            logMessage("OTA upload: " + upload.filename, "info");
+            logMessageFmt("info", "OTA upload: %s", upload.filename.c_str());
         } else {
-            logMessage("OTA begin failed: " + String(OTA_ERROR_STRING()) +
-                       " — partition table mismatch? Reflash via serial.", "error");
+            char errBuf[128];
+            snprintf(errBuf, sizeof(errBuf), "OTA begin failed: %s — partition table mismatch? Reflash via serial.", OTA_ERROR_STRING().c_str());
+            logMessageFmt("error", "%s", errBuf);
         }
     } else if (upload.status == UPLOAD_FILE_WRITE) {
         if (!otaBeginOk) return;
-        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
-            logMessage("OTA write error: " + String(OTA_ERROR_STRING()), "error");
+        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+            char errBuf[128];
+            snprintf(errBuf, sizeof(errBuf), "OTA write error: %s", OTA_ERROR_STRING().c_str());
+            logMessageFmt("error", "%s", errBuf);
+        }
     } else if (upload.status == UPLOAD_FILE_END) {
         if (!otaBeginOk) return;
         if (Update.end(true))
-            logMessage("OTA upload complete: " + String(upload.totalSize) + " bytes", "info");
-        else
-            logMessage("OTA end failed: " + String(OTA_ERROR_STRING()), "error");
+            logMessageFmt("info", "OTA upload complete: %d bytes", upload.totalSize);
+        else {
+            char errBuf[128];
+            snprintf(errBuf, sizeof(errBuf), "OTA end failed: %s", OTA_ERROR_STRING().c_str());
+            logMessageFmt("error", "%s", errBuf);
+        }
     }
 }
 
@@ -455,7 +472,7 @@ static void handleOtaResponse() {
         sendJson(500, String("{\"ok\":false,\"error\":\"") + OTA_ERROR_STRING() + "\"}");
     else {
         sendJson(200, "{\"ok\":true,\"msg\":\"Rebooting...\"}");
-        logMessage("OTA done — rebooting", "info");
+        logMessage("info", "OTA done — rebooting");
         vTaskDelay(pdMS_TO_TICKS(500));
         DEVICE_RESTART();
     }
@@ -474,7 +491,7 @@ static void handleConfigReset() {
     LittleFS.remove(HW_CONF_PATH);
     LittleFS.remove(SENSOR_SETUP_PATH);
 
-    logMessage("Config reset — rebooting", "warn");
+    logMessage("warn", "Config reset — rebooting");
     sendJson(200, "{\"ok\":true,\"msg\":\"Config reset — rebooting\"}");
     rebootPending = true;
 }
@@ -623,7 +640,7 @@ static void handlePostFeatures() {
     if (!doc["web"].isNull())   f.web   = doc["web"].as<bool>();
     if (!doc["wsLog"].isNull()) f.wsLog = doc["wsLog"].as<bool>();
     if (!saveFeatures(f)) { sendJson(500, "{\"error\":\"save failed\"}"); return; }
-    logMessage("Features saved", "info");
+    logMessage("info", "Features saved");
     sendJson(200, "{\"ok\":true,\"msg\":\"Saved.\"}");
 
 }
@@ -685,8 +702,8 @@ static void webServerSetup() {
     });
 
     httpServer.begin();
-    logMessage("HTTP server started on port 80", "info");
-    logMessage("WebSocket log on port 81", "info");
+    logMessage("info", "HTTP server started on port 80");
+    logMessage("info", "WebSocket log on port 81");
 }
 
 void webTask(void* pvParameters) {
@@ -695,7 +712,7 @@ void webTask(void* pvParameters) {
         if (s_webEnabled) {
             httpServer.handleClient();
             if (rebootPending) {
-                logMessage("Rebooting...", "info");
+                logMessage("info", "Rebooting...");
                 vTaskDelay(pdMS_TO_TICKS(500));
                 DEVICE_RESTART();
             }
@@ -713,7 +730,7 @@ void webProcess() {
     if (!s_webEnabled) return;
     httpServer.handleClient();
     if (rebootPending) {
-        logMessage("Rebooting...", "info");
+        logMessage("info", "Rebooting...");
         delay(500);
         DEVICE_RESTART();
     }

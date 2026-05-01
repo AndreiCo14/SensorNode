@@ -8,11 +8,11 @@ static Adafruit_BMP280 bmp280;
 bool Bmp280Sensor::begin(int, int, int, int, int) {
     _ready = false;
     if (!bmp280.begin(_addr)) {
-        logMessage("BMP280 not found at 0x" + String(_addr, HEX), "warn");
+        logMessageFmt("warn", "BMP280 not found at 0x%X", _addr);
         return false;
     }
     _ready = true;
-    logMessage("BMP280 OK (0x" + String(_addr, HEX) + ")", "info");
+    logMessageFmt("info", "BMP280 OK (0x%X)", _addr);
     return true;
 }
 
