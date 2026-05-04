@@ -992,10 +992,10 @@ function deleteFile() {
   fetch('/api/fs?file=' + encodeURIComponent(name), {
     method: 'DELETE'
   })
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if (d.ok) { el.value = 'Deleted: ' + name; }
-      else { el.value = 'Error: ' + d.error; }
+    .then(function(r){return r.text();})
+    .then(function(text){
+      if (text === 'OK') { el.value = 'Deleted: ' + name; }
+      else { el.value = 'Error: ' + text; }
     })
     .catch(function(e){el.value='Delete failed: '+e.message;});
 }
