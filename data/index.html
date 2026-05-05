@@ -945,59 +945,45 @@ function runI2cScan() {
 }
 
 function listFiles() {
-  var el = document.getElementById('fs-result');
-  el.value = 'Loading...';
   fetch('/api/fs')
-    .catch(function(){el.value='Failed to list files';});
+    .catch(function(){});
 }
 
 function readFile() {
   var name = document.getElementById('fs-filename').value.trim();
-  var el = document.getElementById('fs-result');
-  if (!name) { el.value = 'Enter a filename'; return; }
-  el.value = 'Reading...';
   fetch('/api/fs?file=' + encodeURIComponent(name))
-    .catch(function(e){el.value='Error: '+e.message;});
+    .catch(function(e){});
 }
 
 function saveFile() {
   var name = document.getElementById('fs-filename').value.trim();
   var el = document.getElementById('fs-result');
-  if (!name) { alert('Enter a filename'); return; }
   var content = el.value;
+
   fetch('/api/fs?file=' + encodeURIComponent(name), {
     method: 'POST',
     headers: {'Content-Type': 'text/plain'},
     body: content
   })
-    .then(function(r){return r.text();})
-    .then(function(text){
-      try {
-        var d = JSON.parse(text);
-        if (d.ok) { el.value = 'Saved: ' + name; }
-        else { el.value = 'Error: ' + d.error; }
-      } catch(e) {
-        el.value = 'Saved: ' + name;
-      }
+    .finally(function() {
+      // Выполняется всегда, независимо от успеха или ошибки запроса
+      listFiles();
     })
-    .catch(function(e){el.value='Save failed: '+e.message;});
+    .catch(function(e) {
+      // Ошибку можно залогировать, но список всё равно обновится в finally
+    });
 }
 
 function deleteFile() {
   var name = document.getElementById('fs-filename').value.trim();
-  var el = document.getElementById('fs-result');
-  if (!name) { el.value = 'Enter a filename'; return; }
   if (!confirm('Delete file: ' + name + '?')) { return; }
-  el.value = 'Deleting...';
   fetch('/api/fs?file=' + encodeURIComponent(name), {
     method: 'DELETE'
   })
-    .then(function(r){return r.text();})
-    .then(function(text){
-      if (text === 'OK') { el.value = 'Deleted: ' + name; }
-      else { el.value = 'Error: ' + text; }
+    .finally(function() {
+      listFiles();
     })
-    .catch(function(e){el.value='Delete failed: '+e.message;});
+    .catch(function(e){});
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -1047,9 +1033,8 @@ function connectWs() {
     // Handle file system responses
     if (d.hasOwnProperty('files')) {
       var el = document.getElementById('fs-result');
-      if (!d.mounted) { el.value = 'File system not mounted'; return; }
+      if (!d.mounted) { return; }
       var files = d.files || [];
-      if (!files.length) { el.value = 'No files found'; return; }
       el.value = files.map(function(f){ return f.name + ' (' + f.size + ' bytes)'; }).join('\n');
       return;
     }
