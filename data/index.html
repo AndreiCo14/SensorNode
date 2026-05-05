@@ -945,13 +945,13 @@ function runI2cScan() {
 }
 
 function listFiles() {
-  fetch('/api/fs')
+  fetch('/api/fs/list')
     .catch(function(){});
 }
 
 function readFile() {
   var name = document.getElementById('fs-filename').value.trim();
-  fetch('/api/fs?file=' + encodeURIComponent(name))
+  fetch('/api/fs/read?file=' + encodeURIComponent(name))
     .catch(function(e){});
 }
 
