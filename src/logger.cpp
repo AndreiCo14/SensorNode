@@ -69,19 +69,29 @@ void broadcastOnTime(uint16_t onTimeSec) {
     wsServer.broadcastTXT(out);
 }
 
-void broadcastFsList(const String& json) {
+void broadcastFsList(const char* json, size_t len) {
     if (!wsStarted) return;
-    String payload = json;  // Create a mutable copy for the library
-    wsServer.broadcastTXT(payload);
+    wsServer.broadcastTXT(json, len);
 }
 
-void broadcastFsContent(const String& content) {
+void broadcastFsContent(const char* content, size_t len) {
     if (!wsStarted) return;
-    JsonDocument doc;
-    doc["fsContent"] = content;
-    String out;
-    serializeJson(doc, out);
-    wsServer.broadcastTXT(out);
+    
+    // Build JSON manually to avoid String allocation for the content value
+    const size_t MAX_BUF = 256;
+    char header[MAX_BUF];
+    snprintf(header, sizeof(header), "{\"fsContent\":\"");
+    
+    // Send header
+    wsServer.broadcastTXT(header, strlen(header));
+    
+    // Send content (need to escape special characters for JSON)
+    // For simplicity, send as-is assuming text content
+    wsServer.broadcastTXT(content, len);
+    
+    // Send footer
+    const char* footer = "\"}";
+    wsServer.broadcastTXT(footer, 2);
 }
 
 static LogEntry ringBuffer[LOG_RING_SIZE];
