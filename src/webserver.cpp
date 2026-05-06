@@ -498,37 +498,54 @@ static void handleConfigReset() {
 
 // ─── GET /api/fs/list (list files) ────────────────────────────────────────────
 static void handleGetFsList() {
-    String filename = httpServer.arg("file");
-    JsonDocument doc;
-    doc["mounted"] = lfsReady;
-    JsonArray files = doc["files"].to<JsonArray>();
-    if (lfsReady) {
-        File root = LittleFS.open("/", "r");
-        File entry = root.openNextFile();
-        while (entry) {
-            JsonObject f = files.add<JsonObject>();
-            f["name"] = String("/") + entry.name();
-            f["size"] = entry.size();
-            entry = root.openNextFile();
-        }
-        root.close();
+    // Send start of JSON
+    const char* jsonStart = "{\"mounted\":true,\"files\":[";
+    if (!lfsReady) {
+        jsonStart = "{\"mounted\":false,\"files\":[]}";
+        wsServer.broadcastTXT(jsonStart, strlen(jsonStart));
+        httpServer.send(200, "text/plain", "OK");
+        return;
     }
     
-    // Send file list via WebSocket
-    String output;
-    serializeJson(doc, output);
-    logMessageFmt("info", "FS: Listed %d files", files.size());
-    broadcastFsList(output);
+    wsServer.broadcastTXT(jsonStart, strlen(jsonStart));
     
+    File root = LittleFS.open("/", "r");
+    File entry = root.openNextFile();
+    bool first = true;
+    int fileCount = 0;
+    
+    while (entry) {
+        if (!first) {
+            wsServer.broadcastTXT(",", 1);
+        }
+        first = false;
+        
+        char nameBuf[64];
+        snprintf(nameBuf, sizeof(nameBuf), "/%s", entry.name());
+        
+        // Send file entry as JSON chunk
+        char fileJson[128];
+        snprintf(fileJson, sizeof(fileJson), "{\"name\":\"%s\",\"size\":%d}", nameBuf, (int)entry.size());
+        wsServer.broadcastTXT(fileJson, strlen(fileJson));
+        
+        entry = root.openNextFile();
+        fileCount++;
+    }
+    root.close();
+    
+    // Send end of JSON
+    const char* jsonEnd = "]}";
+    wsServer.broadcastTXT(jsonEnd, 2);
+    
+    logMessageFmt("info", "FS: Listed %d files", fileCount);
     httpServer.send(200, "text/plain", "OK");
 }
-
 // ─── GET /api/fs/read (read file) ─────────────────────────────────────────────
 
 static void handleGetFsRead() {
-    String filename = httpServer.arg("file");
+    const char* filename = httpServer.arg("file").c_str();
 
-    if (filename.length() == 0) {
+    if (!filename || strlen(filename) == 0) {
         logMessageFmt("info", "FS: No filename provided");
         httpServer.send(400, "text/plain", "OK");
         return;
@@ -539,34 +556,60 @@ static void handleGetFsRead() {
         httpServer.send(503, "text/plain", "OK");
         return;
     }
-    String fullPath = filename;
-    if (!fullPath.startsWith("/")) {
-        fullPath = "/" + fullPath;
+
+    char fullPath[128];
+    if (filename[0] != '/') {
+        snprintf(fullPath, sizeof(fullPath), "/%s", filename);
+    } else {
+        strncpy(fullPath, filename, sizeof(fullPath) - 1);
+        fullPath[sizeof(fullPath) - 1] = '\0';
     }
     if (!LittleFS.exists(fullPath)) {
-        logMessageFmt("info", "FS: File not found: %s", filename.c_str());
+        logMessageFmt("info", "FS: File not found: %s", filename);
         httpServer.send(404, "text/plain", "OK");
         return;
     }
     File file = LittleFS.open(fullPath, "r");
     if (!file) {
-        logMessageFmt("info", "FS: Failed to open file: %s", filename.c_str());
+        logMessageFmt("info", "FS: Failed to open file: %s", filename);
         httpServer.send(500, "text/plain", "OK");
         return;
     }
-    String content = file.readString();
+
+    const size_t CHUNK_SIZE = 256;
+    char buffer[CHUNK_SIZE + 1];
+    size_t totalRead = 0;
+
+    // Send start marker with filename
+    const char* startMarker = "{\"fsContentStart\":\"";
+    wsServer.broadcastTXT(startMarker, strlen(startMarker));
+    char namePart[128];
+    snprintf(namePart, sizeof(namePart), "%s\",", fullPath);
+    wsServer.broadcastTXT(namePart, strlen(namePart));
+
+    // Read and send file in chunks
+    while (file.available()) {
+        size_t bytesRead = file.read((uint8_t*)buffer, CHUNK_SIZE);
+        if (bytesRead == 0) break;
+        wsServer.broadcastTXT(buffer, bytesRead);
+        totalRead += bytesRead;
+    }
+
     file.close();
-    logMessageFmt("info", "FS: File read: %s (%d bytes)", filename.c_str(), content.length());
-    broadcastFsContent(content);
+
+    // Send end marker
+    const char* endMarker = "\"}";
+    wsServer.broadcastTXT(endMarker, 2);
+
+    logMessageFmt("info", "FS: File read: %s (%d bytes)", filename, totalRead);
     httpServer.send(200, "text/plain", "OK");
 }
 
-// ─── POST /api/fs (save file) ─────────────────────────────────────────────────
 
 static void handlePostFs() {
-    String filename = httpServer.arg("file");
+    const char* filename = httpServer.arg("file").c_str();
 
-    if (filename.length() == 0) {
+    if (!filename || strlen(filename) == 0) {
         logMessageFmt("info", "FS: No filename provided");
         httpServer.send(200, "text/plain", "OK");
         return;
@@ -578,39 +621,44 @@ static void handlePostFs() {
         return;
     }
 
-    String fullPath = filename;
-    if (!fullPath.startsWith("/")) {
-        fullPath = "/" + fullPath;
+    char fullPath[128];
+    if (filename[0] != '/') {
+        snprintf(fullPath, sizeof(fullPath), "/%s", filename);
+    } else {
+        strncpy(fullPath, filename, sizeof(fullPath) - 1);
+        fullPath[sizeof(fullPath) - 1] = '\0';
     }
 
-    String content = httpServer.arg("plain");
+    const String& content = httpServer.arg("plain");
+    const char* contentStr = content.c_str();
+    size_t contentLen = content.length();
 
     File file = LittleFS.open(fullPath, "w");
     if (!file) {
-        logMessageFmt("info", "FS: Failed to open file for writing: %s", fullPath.c_str());
+        logMessageFmt("info", "FS: Failed to open file for writing: %s", fullPath);
         httpServer.send(200, "text/plain", "OK");
         return;
     }
 
-    size_t written = file.print(content);
+    size_t written = file.write((const uint8_t*)contentStr, contentLen);
     file.close();
 
-    if (written == 0 && content.length() > 0) {
-        logMessageFmt("info", "FS: Failed to write content: %s", fullPath.c_str());
+    if (written == 0 && contentLen > 0) {
+        logMessageFmt("info", "FS: Failed to write content: %s", fullPath);
         httpServer.send(200, "text/plain", "OK");
         return;
     }
 
-    logMessageFmt("info", "FS: Saved %s (%d bytes)", fullPath.c_str(), written);
+    logMessageFmt("info", "FS: Saved %s (%d bytes)", fullPath, written);
     httpServer.send(200, "text/plain", "OK");
 }
 
 // ─── DELETE /api/fs (delete file) ─────────────────────────────────────────────
 
 static void handleDeleteFs() {
-    String filename = httpServer.arg("file");
+    const char* filename = httpServer.arg("file").c_str();
 
-    if (filename.length() == 0) {
+    if (!filename || strlen(filename) == 0) {
         logMessageFmt("info", "FS: No filename provided");
         httpServer.send(200, "text/plain", "OK");
         return;
@@ -622,24 +670,27 @@ static void handleDeleteFs() {
         return;
     }
 
-    String fullPath = filename;
-    if (!fullPath.startsWith("/")) {
-        fullPath = "/" + fullPath;
+    char fullPath[128];
+    if (filename[0] != '/') {
+        snprintf(fullPath, sizeof(fullPath), "/%s", filename);
+    } else {
+        strncpy(fullPath, filename, sizeof(fullPath) - 1);
+        fullPath[sizeof(fullPath) - 1] = '\0';
     }
 
     if (!LittleFS.exists(fullPath)) {
-        logMessageFmt("info", "FS: File not found: %s", filename.c_str());
+        logMessageFmt("info", "FS: File not found: %s", filename);
         httpServer.send(200, "text/plain", "OK");
         return;
     }
 
     if (!LittleFS.remove(fullPath)) {
-        logMessageFmt("info", "FS: Failed to delete file: %s", fullPath.c_str());
+        logMessageFmt("info", "FS: Failed to delete file: %s", fullPath);
         httpServer.send(200, "text/plain", "OK");
         return;
     }
 
-    logMessageFmt("info", "FS: Deleted %s", filename.c_str());
+    logMessageFmt("info", "FS: Deleted %s", filename);
     httpServer.send(200, "text/plain", "OK");
 }
 
