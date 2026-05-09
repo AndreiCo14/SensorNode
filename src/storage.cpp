@@ -260,6 +260,7 @@ bool loadHwConfig(HwConfig& cfg) {
     cfg.onTime       = 30;
     cfg.deepSleep    = false;
     cfg.ignoreCmd    = false;
+    cfg.narodmon     = false;
 
     JsonDocument doc;
     if (!readJson(HW_CONF_PATH, doc)) return false;
@@ -290,6 +291,7 @@ bool loadHwConfig(HwConfig& cfg) {
     }
     cfg.deepSleep   = doc["deepSleep"]   | false;
     cfg.ignoreCmd   = doc["ignoreCmd"]   | false;
+    cfg.narodmon    = doc["narodmon"]    | false;
     cfg.provisioned = doc["provisioned"] | false;
     return true;
 }
@@ -315,6 +317,7 @@ bool saveHwConfig(const HwConfig& cfg) {
     doc["onTime"]        = cfg.onTime;
     doc["deepSleep"]     = cfg.deepSleep;
     doc["ignoreCmd"]     = cfg.ignoreCmd;
+    doc["narodmon"]      = cfg.narodmon;
     doc["provisioned"]   = cfg.provisioned;
     return writeJson(HW_CONF_PATH, doc);
 }

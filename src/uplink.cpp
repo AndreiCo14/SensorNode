@@ -597,6 +597,13 @@ static void handleCommand(const char* payload) {
         needsSave = true;
     }
 
+    if (!doc["narodmon"].isNull()) {
+        bool val = doc["narodmon"].as<bool>();
+        setNarodmonMode(val);
+        logMessageFmt("info", "narodmon -> %s", (val ? "on" : "off"));
+        needsSave = true;
+    }
+
     if (needsSave) {
         HwConfig hw;
         loadHwConfig(hw);
@@ -605,6 +612,7 @@ static void handleCommand(const char* payload) {
         hw.onTime        = STATE_GET(onTime);
         hw.deepSleep     = getDeepSleepMode();
         hw.ignoreCmd     = getIgnoreCmdMode();
+        hw.narodmon      = getNarodmonMode();
         saveHwConfig(hw);
         logMessage("info", "hwconfig saved");
     }

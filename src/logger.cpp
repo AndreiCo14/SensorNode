@@ -11,6 +11,7 @@ static bool debugLogEnabled = false;
 static bool maintenanceModeEnabled = false;
 static bool deepSleepModeEnabled = false;
 static bool ignoreCmdModeEnabled = false;
+static bool narodmonEnabled = false;
 static bool s_wsEnabled = true;
 
 void setDebugLog(bool en) { debugLogEnabled = en; }
@@ -19,10 +20,12 @@ bool getDebugLog()        { return debugLogEnabled; }
 void setMaintenanceMode(bool en) {maintenanceModeEnabled = en;   broadcast_maintenance(en);}
 void setDeepSleepMode(bool en)   {deepSleepModeEnabled = en;     broadcast_deepSleep(en);}
 void setIgnoreCmdMode(bool en)   {ignoreCmdModeEnabled = en;     broadcast_ignoreCmd(en);}
+void setNarodmonMode(bool en)    {narodmonEnabled = en;          broadcast_narodmon(en);}
 
 bool getMaintenanceMode() { return maintenanceModeEnabled; }
 bool getDeepSleepMode() { return deepSleepModeEnabled; }
 bool getIgnoreCmdMode() { return ignoreCmdModeEnabled; }
+bool getNarodmonMode()  { return narodmonEnabled; }
 
 void loggerSetWsEnabled(bool en) { s_wsEnabled = en; }
 
@@ -46,6 +49,14 @@ void broadcast_ignoreCmd( bool ignoreCmd) {
     if (!wsStarted) return;
     JsonDocument doc;
     doc["ignoreCmd"] = ignoreCmd;
+    String out;
+    serializeJson(doc, out);
+    wsServer.broadcastTXT(out);
+}
+void broadcast_narodmon(bool narodmon) {
+    if (!wsStarted) return;
+    JsonDocument doc;
+    doc["narodmon"] = narodmon;
     String out;
     serializeJson(doc, out);
     wsServer.broadcastTXT(out);

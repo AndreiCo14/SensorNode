@@ -286,7 +286,7 @@ logMessageFmt("1","%s",s_lastData[i]);
     merged[mlen]     = '}';
     merged[mlen + 1] = '\0'; //Пакет с данными датчиков
 logMessageFmt("2","%s",merged);
-    send_to_narodmon(merged);
+    if (getNarodmonMode()) {send_to_narodmon(merged);}
 
     if (!hasData) return;
 

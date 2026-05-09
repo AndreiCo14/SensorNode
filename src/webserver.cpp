@@ -95,6 +95,7 @@ static void handleGetState() {
     doc["maintenance"] = getMaintenanceMode();
     doc["deepSleep"]  = getDeepSleepMode();
     doc["ignoreCmd"]  = getIgnoreCmdMode();
+    doc["narodmon"]   = getNarodmonMode();
     doc["onTime"]     = sysState.onTime;
 #ifdef ESP8266
     doc["vcc"]        = ESP.getVcc() / 1000.0f;
