@@ -71,11 +71,12 @@ enum UplinkState { US_AP_WINDOW, US_AP_ONLY, US_CONNECTED };
 static UplinkState s_uplinkState   = US_AP_WINDOW;
 static uint32_t    s_apWindowStart = 0;
 static bool        s_triedSecondary = false;
-static char        s_ssid[33], s_pass[65], s_ssid2[33], s_pass2[65];
-static SensorReading s_batch[10];
-static uint8_t     s_batchCount = 0;
-static uint32_t    s_lastTele   = 0;
 #endif
+
+static char wifiSsid[33] = {}, wifiPass[65] = {}, wifiSsid2[33] = {}, wifiPass2[65] = {};
+static SensorReading batch[10];
+static uint8_t       batchCount = 0;
+static uint32_t      lastTele   = 0;
 
 // ─── Topic builder ────────────────────────────────────────────────────────────
 
@@ -946,16 +947,123 @@ static void tryDeferredSubscribe() {
     if (!s_publishStartSent) { publishStart(); s_publishStartSent = true; }
 }
 
+static void processConnectedLoop() {
+    tryDeferredSubscribe();
+
+    SensorReading reading;
+    if (xQueueReceive(sensorQueue, &reading, 0) == pdTRUE) {
+        if (!getMaintenanceMode()) {
+            reading.time = getEpochTime();
+            if (batchCount < 10) batch[batchCount++] = reading;
+            else {
+                logMessage("warn", "Batch overflow — dropping oldest");
+                memmove(batch, batch + 1, sizeof(SensorReading) * 9);
+                batch[9] = reading;
+            }
+        }
+    }
+    if (s_provisionPending) {
+        s_provisionPending = false;
+        handleProvisioningConfig(s_provisionPayload.c_str());
+    }
+
+    MqttCommand cmd;
+    if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE) handleCommand(cmd.payload);
+
+    // Enable sensors after startup command window expires
+    if (s_startupWindowMs && !s_sensorsStarted &&
+        millis() - s_startupWindowMs >= STARTUP_CMD_WINDOW_MS) {
+        s_sensorsStarted = true;
+        if (getDeepSleepMode() && !getMaintenanceMode()) {
+            logMessageFmt("debug", "Startup window: deep sleep mode — onTime=%ds, interval=%dm", STATE_GET(onTime), STATE_GET(teleIntervalM));
+            sensorsEnableDeepSleep();
+        } else {
+            logMessageFmt("debug", "Startup window: normal mode%s", (getDeepSleepMode() ? " (maintenance override)" : ""));
+            sensorsEnable();
+        }
+    }
+
+    int8_t sn = STATE_GET(sampleNum);
+    if (batchCount >= sn && batchCount > 0) {
+        publishSensorData(batch, batchCount);
+        STATE_LOCK();
+        sysState.readingCount += batchCount;
+        STATE_UNLOCK();
+        sendTelemetry();
+        batchCount = 0;
+        lastTele   = millis() / 1000;
+
+        if (getDeepSleepMode() && !getMaintenanceMode()) {
+            uint32_t sleepSec = (uint32_t)STATE_GET(teleIntervalM) * 60UL;
+            logMessageFmt("debug", "Deep sleep trigger: flushing MQTT, then sleeping %ds", sleepSec);
+            publishSleepStatus(sleepSec);
+#ifdef ESP8266
+            MQTT_LOOP();
+            delay(200);
+#else
+            // Flush MQTT outbox before sleeping
+            for (int i = 0; i < 30; i++) { MQTT_LOOP(); vTaskDelay(pdMS_TO_TICKS(10)); }
+#endif
+            enterDeepSleep(sleepSec);
+        }
+    }
+
+    uint32_t now     = millis() / 1000;
+    uint16_t teleInt = STATE_GET(teleIntervalM);
+    if (now - lastTele > (uint32_t)teleInt * 60) {
+        sendTelemetry();
+        lastTele = now;
+    }
+
+    if (apRequested) {
+        apRequested = false;
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.softAP(g_apSsid);
+        dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
+        STATE_SET(apMode, true);
+        logMessageFmt("info", "AP re-enabled: %s", g_apSsid);
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
+        if (s_wifiWasConnected) {
+            s_wifiWasConnected  = false;
+            s_wifiLostAt        = millis();
+            s_lastWifiAttempt   = 0;
+            s_wifiAltSecondary  = false;
+            STATE_SET(wifiConnected, false);
+            logMessage("warn", "WiFi lost");
+        }
+        ledSetState(LED_CONNECTING);
+        wifiReconnectTick(wifiSsid, wifiPass, wifiSsid2, wifiPass2);
+    } else {
+        if (!s_wifiWasConnected) {
+            wifiReconnected();
+            configTzTime(MYTZ, "time.google.com", "pool.ntp.org");
+        }
+        STATE_SET(wifiConnected, true);
+    }
+//#ifdef ESP8266
+//    if (!MQTT_CONNECTED() && WiFi.status() == WL_CONNECTED) MQTT_CONNECT();
+//#else
+    if (!MQTT_CONNECTED() && WiFi.status() == WL_CONNECTED) {
+        static uint32_t s_lastMqttAttempt = 0;
+        uint32_t now32 = millis();
+        uint32_t intervalMs = (uint32_t)mqttCfgData.reconnIntervalS * 1000;
+        if (now32 - s_lastMqttAttempt >= intervalMs) {
+            s_lastMqttAttempt = now32;
+            logMessage("warn", "MQTT reconnecting...");
+            MQTT_CONNECT();
+        }
+    }
+//#endif
+
+    STATE_SET(mqttConnected, MQTT_CONNECTED());
+}
 // ─── Uplink task ──────────────────────────────────────────────────────────────
 
 void uplinkTask(void* pvParameters) {
     loadMqttConfig(mqttCfgData);
-
-    snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
-             (unsigned long)STATE_GET(chipId));
-
-    char wifiSsid[33] = {}, wifiPass[65] = {};
-    char wifiSsid2[33] = {}, wifiPass2[65] = {};
+    snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu", (unsigned long)STATE_GET(chipId));
     loadWifiCreds(wifiSsid, sizeof(wifiSsid), wifiPass, sizeof(wifiPass),
                   wifiSsid2, sizeof(wifiSsid2), wifiPass2, sizeof(wifiPass2));
 
@@ -996,119 +1104,11 @@ void uplinkTask(void* pvParameters) {
 
     initMqtt();
 
-    SensorReading batch[10];
-    uint8_t  batchCount = 0;
-    uint32_t lastTele   = 0;
     s_wifiWasConnected = true;  // WiFi is up at this point
 
     for (;;) {
         MQTT_LOOP();
-
-        tryDeferredSubscribe();
-
-        SensorReading reading;
-        if (xQueueReceive(sensorQueue, &reading, 0) == pdTRUE) {
-            if (!getMaintenanceMode()) {
-                reading.time = getEpochTime();
-                if (batchCount < 10)
-                    batch[batchCount++] = reading;
-                else {
-                    logMessage("warn", "Batch overflow — dropping oldest");
-                    memmove(batch, batch + 1, sizeof(SensorReading) * 9);
-                    batch[9] = reading;
-                }
-            }
-        }
-        if (s_provisionPending) {
-            s_provisionPending = false;
-            handleProvisioningConfig(s_provisionPayload.c_str());
-        }
-
-        MqttCommand cmd;
-        if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE)
-            handleCommand(cmd.payload);
-
-        // Enable sensors after startup command window expires
-        if (s_startupWindowMs && !s_sensorsStarted &&
-            millis() - s_startupWindowMs >= STARTUP_CMD_WINDOW_MS) {
-            s_sensorsStarted = true;
-            if (getDeepSleepMode() && !getMaintenanceMode()) {
-                logMessageFmt("debug", "Startup window: deep sleep mode — onTime=%ds, interval=%dm", STATE_GET(onTime), STATE_GET(teleIntervalM));
-                sensorsEnableDeepSleep();
-            } else {
-                logMessageFmt("debug", "Startup window: normal mode%s", (getDeepSleepMode() ? " (maintenance override)" : ""));
-                sensorsEnable();
-            }
-        }
-
-        int8_t sn = STATE_GET(sampleNum);
-        if (batchCount >= sn && batchCount > 0) {
-            publishSensorData(batch, batchCount);
-            STATE_LOCK();
-            sysState.readingCount += batchCount;
-            STATE_UNLOCK();
-            sendTelemetry();
-            batchCount = 0;
-            lastTele = millis() / 1000;
-
-            if (getDeepSleepMode() && !getMaintenanceMode()) {
-                uint32_t sleepSec = (uint32_t)STATE_GET(teleIntervalM) * 60UL;
-                logMessageFmt("debug", "Deep sleep trigger: flushing MQTT, then sleeping %ds", sleepSec);
-                publishSleepStatus(sleepSec);
-                // Flush MQTT outbox before sleeping
-                for (int i = 0; i < 30; i++) { MQTT_LOOP(); vTaskDelay(pdMS_TO_TICKS(10)); }
-                enterDeepSleep(sleepSec);
-            }
-        }
-
-        uint32_t now     = millis() / 1000;
-        uint16_t teleInt = STATE_GET(teleIntervalM);
-        if (now - lastTele > (uint32_t)teleInt * 60) {
-            sendTelemetry();
-            lastTele = now;
-        }
-
-        if (apRequested) {
-            apRequested = false;
-            WiFi.mode(WIFI_AP_STA);
-            WiFi.softAP(g_apSsid);
-            dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
-            STATE_SET(apMode, true);
-            logMessageFmt("info", "AP re-enabled: %s", g_apSsid);
-        }
-
-        if (WiFi.status() != WL_CONNECTED) {
-            if (s_wifiWasConnected) {
-                s_wifiWasConnected  = false;
-                s_wifiLostAt        = millis();
-                s_lastWifiAttempt   = 0;
-                s_wifiAltSecondary  = false;
-                STATE_SET(wifiConnected, false);
-                logMessage("warn", "WiFi lost");
-            }
-            ledSetState(LED_CONNECTING);
-            wifiReconnectTick(wifiSsid, wifiPass, wifiSsid2, wifiPass2);
-        } else {
-            if (!s_wifiWasConnected) {
-                wifiReconnected();
-                configTzTime(MYTZ, "time.google.com", "pool.ntp.org");
-            }
-            STATE_SET(wifiConnected, true);
-        }
-
-        static uint32_t s_lastMqttAttempt = 0;
-        if (!MQTT_CONNECTED() && WiFi.status() == WL_CONNECTED) {
-            uint32_t now32 = millis();
-            uint32_t intervalMs = (uint32_t)mqttCfgData.reconnIntervalS * 1000;
-            if (now32 - s_lastMqttAttempt >= intervalMs) {
-                s_lastMqttAttempt = now32;
-                logMessage("warn", "MQTT reconnecting...");
-                MQTT_CONNECT();
-            }
-        }
-
-        STATE_SET(mqttConnected, MQTT_CONNECTED());
-
+        processConnectedLoop();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
@@ -1118,26 +1118,25 @@ void uplinkTask(void* pvParameters) {
 
 void uplinkInit() {
     loadMqttConfig(mqttCfgData);
-    snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu",
-             (unsigned long)STATE_GET(chipId));
-    loadWifiCreds(s_ssid, sizeof(s_ssid), s_pass, sizeof(s_pass),
-                  s_ssid2, sizeof(s_ssid2), s_pass2, sizeof(s_pass2));
+    snprintf(g_apSsid, sizeof(g_apSsid), "AirMQ-SN-%lu", (unsigned long)STATE_GET(chipId));
+    loadWifiCreds(wifiSsid, sizeof(wifiSsid), wifiPass, sizeof(wifiPass),
+                  wifiSsid2, sizeof(wifiSsid2), wifiPass2, sizeof(wifiPass2));
 
     // If no saved creds (e.g. ESPEasy used SPIFFS which got erased on first
     // LittleFS mount), fall back to SDK-cached credentials — ESP8266 SDK stores
     // the last-used AP in reserved flash sectors that survive OTA and FS reformats.
-    if (strlen(s_ssid) == 0) {
+    if (strlen(wifiSsid) == 0) {
         String sdkSsid = WiFi.SSID();
         if (sdkSsid.length() > 0) {
-            strncpy(s_ssid, sdkSsid.c_str(), sizeof(s_ssid) - 1);
-            strncpy(s_pass, WiFi.psk().c_str(), sizeof(s_pass) - 1);
+            strncpy(wifiSsid, sdkSsid.c_str(), sizeof(wifiSsid) - 1);
+            strncpy(wifiPass, WiFi.psk().c_str(), sizeof(wifiPass) - 1);
             logMessageFmt("warn", "No saved WiFi — SDK cache: %s", sdkSsid.c_str());
-            if (lfsReady) saveWifiCreds(s_ssid, s_pass, s_ssid2, s_pass2);
+            if (lfsReady) saveWifiCreds(wifiSsid, wifiPass, wifiSsid2, wifiPass2);
         }
     }
 
-    bool hasPrimary   = (strlen(s_ssid) > 0);
-    bool hasSecondary = (strlen(s_ssid2) > 0);
+    bool hasPrimary   = (strlen(wifiSsid) > 0);
+    bool hasSecondary = (strlen(wifiSsid2) > 0);
     bool hasSta       = hasPrimary || hasSecondary;
 
     WiFi.mode(hasSta ? WIFI_AP_STA : WIFI_AP);
@@ -1147,12 +1146,12 @@ void uplinkInit() {
 
     if (hasPrimary) {
         WiFi.setHostname(g_apSsid);
-        WiFi.begin(s_ssid, s_pass);
-        logMessageFmt("info", "STA -> %s", s_ssid);
+        WiFi.begin(wifiSsid, wifiPass);
+        logMessageFmt("info", "STA -> %s", wifiSsid);
     } else if (hasSecondary) {
         WiFi.setHostname(g_apSsid);
-        WiFi.begin(s_ssid2, s_pass2);
-        logMessageFmt("info", "STA -> %s", s_ssid2);
+        WiFi.begin(wifiSsid2, wifiPass2);
+        logMessageFmt("info", "STA -> %s", wifiSsid2);
     }
 
     s_apWindowStart  = millis();
@@ -1169,8 +1168,7 @@ void uplinkProcess() {
         dnsServer.processNextRequest();
         {
             MqttCommand cmd;
-            if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE)
-                handleCommand(cmd.payload);
+            if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE) handleCommand(cmd.payload);
         }
         if (WiFi.status() == WL_CONNECTED) {
             logMessageFmt("info", "WiFi STA: %s", WiFi.localIP().toString().c_str());
@@ -1190,8 +1188,8 @@ void uplinkProcess() {
             millis() - s_apWindowStart > WIFI_PRIMARY_TIMEOUT_MS) {
             s_triedSecondary = true;
             WiFi.disconnect(false);
-            WiFi.begin(s_ssid2, s_pass2);
-            logMessageFmt("info", "STA fallback -> %s", s_ssid2);
+            WiFi.begin(wifiSsid2, wifiPass2);
+            logMessageFmt("info", "STA fallback -> %s", wifiSsid2);
         }
         if (millis() - s_apWindowStart > AP_WINDOW_MS) {
             logMessage("warn", "AP window expired — no STA, retrying networks");
@@ -1208,12 +1206,11 @@ void uplinkProcess() {
         dnsServer.processNextRequest();
         {
             MqttCommand cmd;
-            if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE)
-                handleCommand(cmd.payload);
+            if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE) handleCommand(cmd.payload);
             SensorReading r;
             while (xQueueReceive(sensorQueue, &r, 0) == pdTRUE) {}
         }
-        wifiReconnectTick(s_ssid, s_pass, s_ssid2, s_pass2);
+        wifiReconnectTick(wifiSsid, wifiPass, wifiSsid2, wifiPass2);
         if (WiFi.status() == WL_CONNECTED) {
             wifiReconnected();  // closes AP, sets LED_CONNECTED
             configTzTime(MYTZ, "time.google.com", "pool.ntp.org");
@@ -1224,103 +1221,7 @@ void uplinkProcess() {
 
     case US_CONNECTED:
         MQTT_LOOP();
-        {
-            tryDeferredSubscribe();
-
-            SensorReading reading;
-            if (xQueueReceive(sensorQueue, &reading, 0) == pdTRUE) {
-                if (!getMaintenanceMode()) {
-                    reading.time = getEpochTime();
-                    if (s_batchCount < 10)
-                        s_batch[s_batchCount++] = reading;
-                    else {
-                        memmove(s_batch, s_batch + 1, sizeof(SensorReading) * 9);
-                        s_batch[9] = reading;
-                    }
-                }
-            }
-            if (s_provisionPending) {
-                s_provisionPending = false;
-                handleProvisioningConfig(s_provisionPayload.c_str());
-            }
-
-            MqttCommand cmd;
-            if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE)
-                handleCommand(cmd.payload);
-
-            // Enable sensors after startup command window expires
-            if (s_startupWindowMs && !s_sensorsStarted &&
-                millis() - s_startupWindowMs >= STARTUP_CMD_WINDOW_MS) {
-                s_sensorsStarted = true;
-                if (getDeepSleepMode() && !getMaintenanceMode()) {
-                    logMessageFmt("debug", "Startup window: deep sleep mode — onTime=%ds, interval=%dm", STATE_GET(onTime), STATE_GET(teleIntervalM));
-                    sensorsEnableDeepSleep();
-                } else {
-                    logMessageFmt("debug", "Startup window: normal mode%s", (getDeepSleepMode() ? " (maintenance override)" : ""));
-                    sensorsEnable();
-                }
-            }
-
-            int8_t sn = STATE_GET(sampleNum);
-            if (s_batchCount >= sn && s_batchCount > 0) {
-                publishSensorData(s_batch, s_batchCount);
-                STATE_LOCK();
-                sysState.readingCount += s_batchCount;
-                STATE_UNLOCK();
-                sendTelemetry();
-                s_batchCount = 0;
-                s_lastTele   = millis() / 1000;
-
-                if (getDeepSleepMode() && !getMaintenanceMode()) {
-                    uint32_t sleepSec = (uint32_t)STATE_GET(teleIntervalM) * 60UL;
-                    logMessageFmt("debug", "Deep sleep trigger: flushing MQTT, then sleeping %ds", sleepSec);
-                    publishSleepStatus(sleepSec);
-                    MQTT_LOOP();
-                    delay(200);
-                    enterDeepSleep(sleepSec);
-                }
-            }
-
-            uint32_t now     = millis() / 1000;
-            uint16_t teleInt = STATE_GET(teleIntervalM);
-            if (now - s_lastTele > (uint32_t)teleInt * 60) {
-                sendTelemetry();
-                s_lastTele = now;
-            }
-
-            if (apRequested) {
-                apRequested = false;
-                WiFi.mode(WIFI_AP_STA);
-                WiFi.softAP(g_apSsid);
-                dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
-                STATE_SET(apMode, true);
-                logMessageFmt("info", "AP re-enabled: %s", g_apSsid);
-            }
-
-            if (WiFi.status() != WL_CONNECTED) {
-                if (s_wifiWasConnected) {
-                    s_wifiWasConnected  = false;
-                    s_wifiLostAt        = millis();
-                    s_lastWifiAttempt   = 0;
-                    s_wifiAltSecondary  = false;
-                    STATE_SET(wifiConnected, false);
-                    logMessage("warn", "WiFi lost");
-                }
-                ledSetState(LED_CONNECTING);
-                wifiReconnectTick(s_ssid, s_pass, s_ssid2, s_pass2);
-            } else {
-                if (!s_wifiWasConnected) {
-                    wifiReconnected();
-                    configTzTime(MYTZ, "time.google.com", "pool.ntp.org");
-                }
-                STATE_SET(wifiConnected, true);
-            }
-
-            if (!MQTT_CONNECTED() && WiFi.status() == WL_CONNECTED)
-                MQTT_CONNECT();
-
-            STATE_SET(mqttConnected, MQTT_CONNECTED());
-        }
+        processConnectedLoop();
         break;
     }
 }
