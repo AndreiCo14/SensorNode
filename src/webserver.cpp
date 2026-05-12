@@ -95,6 +95,7 @@ static void handleGetState() {
     doc["maintenance"] = getMaintenanceMode();
     doc["deepSleep"]  = getDeepSleepMode();
     doc["ignoreCmd"]  = getIgnoreCmdMode();
+    doc["narodmon"]   = getNarodmonMode();
     doc["onTime"]     = sysState.onTime;
 #ifdef ESP8266
     doc["vcc"]        = ESP.getVcc() / 1000.0f;
@@ -496,9 +497,9 @@ static void handleConfigReset() {
     rebootPending = true;
 }
 
-// ─── GET /api/fs ──────────────────────────────────────────────────────────────
-
-static void handleGetFs() {
+// ─── GET /api/fs/list (list files) ────────────────────────────────────────────
+static void handleGetFsList() {
+    String filename = httpServer.arg("file");
     JsonDocument doc;
     doc["mounted"] = lfsReady;
     JsonArray files = doc["files"].to<JsonArray>();
@@ -513,7 +514,134 @@ static void handleGetFs() {
         }
         root.close();
     }
-    sendJsonDoc(200, doc);
+    
+    // Send file list via WebSocket
+    String output;
+    serializeJson(doc, output);
+    logMessageFmt("info", "FS: Listed %d files", files.size());
+    broadcastFsList(output);
+    
+    httpServer.send(200, "text/plain", "OK");
+}
+
+// ─── GET /api/fs/read (read file) ─────────────────────────────────────────────
+
+static void handleGetFsRead() {
+    String filename = httpServer.arg("file");
+
+    if (filename.length() == 0) {
+        logMessageFmt("info", "FS: No filename provided");
+        httpServer.send(400, "text/plain", "OK");
+        return;
+    }
+
+    if (!lfsReady) {
+        logMessageFmt("info", "FS: File system not mounted");
+        httpServer.send(503, "text/plain", "OK");
+        return;
+    }
+    String fullPath = filename;
+    if (!fullPath.startsWith("/")) {
+        fullPath = "/" + fullPath;
+    }
+    if (!LittleFS.exists(fullPath)) {
+        logMessageFmt("info", "FS: File not found: %s", filename.c_str());
+        httpServer.send(404, "text/plain", "OK");
+        return;
+    }
+    File file = LittleFS.open(fullPath, "r");
+    if (!file) {
+        logMessageFmt("info", "FS: Failed to open file: %s", filename.c_str());
+        httpServer.send(500, "text/plain", "OK");
+        return;
+    }
+    String content = file.readString();
+    file.close();
+    logMessageFmt("info", "FS: File read: %s (%d bytes)", filename.c_str(), content.length());
+    broadcastFsContent(content);
+    httpServer.send(200, "text/plain", "OK");
+}
+
+// ─── POST /api/fs (save file) ─────────────────────────────────────────────────
+
+static void handlePostFs() {
+    String filename = httpServer.arg("file");
+
+    if (filename.length() == 0) {
+        logMessageFmt("info", "FS: No filename provided");
+        httpServer.send(200, "text/plain", "OK");
+        return;
+    }
+
+    if (!lfsReady) {
+        logMessageFmt("info", "FS: File system not mounted");
+        httpServer.send(200, "text/plain", "OK");
+        return;
+    }
+
+    String fullPath = filename;
+    if (!fullPath.startsWith("/")) {
+        fullPath = "/" + fullPath;
+    }
+
+    String content = httpServer.arg("plain");
+
+    File file = LittleFS.open(fullPath, "w");
+    if (!file) {
+        logMessageFmt("info", "FS: Failed to open file for writing: %s", fullPath.c_str());
+        httpServer.send(200, "text/plain", "OK");
+        return;
+    }
+
+    size_t written = file.print(content);
+    file.close();
+
+    if (written == 0 && content.length() > 0) {
+        logMessageFmt("info", "FS: Failed to write content: %s", fullPath.c_str());
+        httpServer.send(200, "text/plain", "OK");
+        return;
+    }
+
+    logMessageFmt("info", "FS: Saved %s (%d bytes)", fullPath.c_str(), written);
+    httpServer.send(200, "text/plain", "OK");
+}
+
+// ─── DELETE /api/fs (delete file) ─────────────────────────────────────────────
+
+static void handleDeleteFs() {
+    String filename = httpServer.arg("file");
+
+    if (filename.length() == 0) {
+        logMessageFmt("info", "FS: No filename provided");
+        httpServer.send(200, "text/plain", "OK");
+        return;
+    }
+
+    if (!lfsReady) {
+        logMessageFmt("info", "FS: File system not mounted");
+        httpServer.send(200, "text/plain", "OK");
+        return;
+    }
+
+    String fullPath = filename;
+    if (!fullPath.startsWith("/")) {
+        fullPath = "/" + fullPath;
+    }
+
+    if (!LittleFS.exists(fullPath)) {
+        logMessageFmt("info", "FS: File not found: %s", filename.c_str());
+        httpServer.send(200, "text/plain", "OK");
+        return;
+    }
+
+    if (!LittleFS.remove(fullPath)) {
+        logMessageFmt("info", "FS: Failed to delete file: %s", fullPath.c_str());
+        httpServer.send(200, "text/plain", "OK");
+        return;
+    }
+
+    logMessageFmt("info", "FS: Deleted %s", filename.c_str());
+    httpServer.send(200, "text/plain", "OK");
 }
 
 // ─── GET /api/utils/i2c-scan ─────────────────────────────────────────────────
@@ -648,7 +776,10 @@ static void webServerSetup() {
     // Other
     httpServer.on("/api/state",      HTTP_GET,  handleGetState);
     httpServer.on("/api/cmd",        HTTP_POST, handlePostCmd);
-    httpServer.on("/api/fs",         HTTP_GET,  handleGetFs);
+    httpServer.on("/api/fs/list",    HTTP_GET,  handleGetFsList);
+    httpServer.on("/api/fs/read",    HTTP_GET,  handleGetFsRead);
+    httpServer.on("/api/fs",         HTTP_POST, handlePostFs);
+    httpServer.on("/api/fs",         HTTP_DELETE, handleDeleteFs);
     httpServer.on("/api/ota",         HTTP_POST, handleOtaResponse, handleOtaUpload);
     httpServer.on("/api/ota/version", HTTP_GET,  handleGetOtaVersion);
 

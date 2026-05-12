@@ -11,6 +11,7 @@ static bool debugLogEnabled = false;
 static bool maintenanceModeEnabled = false;
 static bool deepSleepModeEnabled = false;
 static bool ignoreCmdModeEnabled = false;
+static bool narodmonEnabled = false;
 static bool s_wsEnabled = true;
 
 void setDebugLog(bool en) { debugLogEnabled = en; }
@@ -19,10 +20,12 @@ bool getDebugLog()        { return debugLogEnabled; }
 void setMaintenanceMode(bool en) {maintenanceModeEnabled = en;   broadcast_maintenance(en);}
 void setDeepSleepMode(bool en)   {deepSleepModeEnabled = en;     broadcast_deepSleep(en);}
 void setIgnoreCmdMode(bool en)   {ignoreCmdModeEnabled = en;     broadcast_ignoreCmd(en);}
+void setNarodmonMode(bool en)    {narodmonEnabled = en;          broadcast_narodmon(en);}
 
 bool getMaintenanceMode() { return maintenanceModeEnabled; }
 bool getDeepSleepMode() { return deepSleepModeEnabled; }
 bool getIgnoreCmdMode() { return ignoreCmdModeEnabled; }
+bool getNarodmonMode()  { return narodmonEnabled; }
 
 void loggerSetWsEnabled(bool en) { s_wsEnabled = en; }
 
@@ -50,6 +53,14 @@ void broadcast_ignoreCmd( bool ignoreCmd) {
     serializeJson(doc, out);
     wsServer.broadcastTXT(out);
 }
+void broadcast_narodmon(bool narodmon) {
+    if (!wsStarted) return;
+    JsonDocument doc;
+    doc["narodmon"] = narodmon;
+    String out;
+    serializeJson(doc, out);
+    wsServer.broadcastTXT(out);
+}
 
 void broadcastTeleInterval(uint16_t teleIntervalM) {
     if (!wsStarted) return;
@@ -64,6 +75,21 @@ void broadcastOnTime(uint16_t onTimeSec) {
     if (!wsStarted) return;
     JsonDocument doc;
     doc["onTime"] = onTimeSec;
+    String out;
+    serializeJson(doc, out);
+    wsServer.broadcastTXT(out);
+}
+
+void broadcastFsList(const String& json) {
+    if (!wsStarted) return;
+    String payload = json;  // Create a mutable copy for the library
+    wsServer.broadcastTXT(payload);
+}
+
+void broadcastFsContent(const String& content) {
+    if (!wsStarted) return;
+    JsonDocument doc;
+    doc["fsContent"] = content;
     String out;
     serializeJson(doc, out);
     wsServer.broadcastTXT(out);

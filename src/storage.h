@@ -39,6 +39,7 @@ struct HwConfig {
     uint16_t onTime;
     bool     deepSleep;
     bool     ignoreCmd;      // disable MQTT command processing
+    bool     narodmon;       // enable sending data to Narodmon
     // Set to true after a provisioning config has been successfully applied
     bool     provisioned;
 };

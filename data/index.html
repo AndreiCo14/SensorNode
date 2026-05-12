@@ -230,13 +230,17 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
 
   <!-- MQTT Config -->
   <section id="mqtt-section" class="draggable-section" draggable="true">
-    <h2>MQTT Config</h2>
-    <div class="form-row"><label>Broker</label><input type="text" id="mqtt-broker" placeholder="hostname or IP" style="width:200px"></div>
+    <h2>Network Config</h2>
+    <div class="form-row"><label>MQTT Broker</label><input type="text" id="mqtt-broker" placeholder="hostname or IP" style="width:200px"></div>
     <div class="form-row"><label>Port</label><input type="number" id="mqtt-port" min="1" max="65535"></div>
     <div class="form-row"><label>Topic Prefix</label><input type="text" id="mqtt-prefix" placeholder="Sensors/" style="width:140px"></div>
     <div class="form-row" id="mqtt-tls-row"><label>TLS / MQTTS</label><input type="checkbox" id="mqtt-tls"></div>
     <button class="btn" onclick="saveMqttConfig()">Save</button>
     <div class="msg" id="mqtt-msg"></div>
+    <div class="form-row" style="margin-bottom:4px">
+      <input type="checkbox" id="narodmon-btn" onchange="toggleNarodmon()">
+      <label for="narodmon-btn" style="width:auto;cursor:pointer">Narodmon</label>
+    </div>
   </section>
 
   <!-- Hardware Setup -->
@@ -267,6 +271,9 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
       <a class="btn" href="/api/config/export">Download Config</a>
     </div>
     <div class="msg" id="sensorsetup-msg"></div>
+    <div class="cmd-divider"></div>
+    <button class="btn" onclick="runI2cScan()">Scan I2C Bus</button>
+    <span id="i2c-result"></span>
   </section>
 
   <!-- Commands -->
@@ -321,15 +328,15 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
     <div class="cmd-divider">
       <div class="sublabel" style="margin-bottom:6px">Provision Config</div>
       <div class="btn-row">
-        <button class="btn" onclick="sendCmd({cmd:'configBackup'})">Save Provision Config</button>
-        <button class="btn danger" onclick="if(confirm('Restore config from broker? Device will re-provision.'))sendCmd({cmd:'configRestore'})">Restore Config</button>
+        <button class="btn" onclick="sendCmd({cmd:'configBackup'})">Save to MQTT</button>
+        <button class="btn danger" onclick="if(confirm('Restore config from broker? Device will re-provision.'))sendCmd({cmd:'configRestore'})">Restore from MQTT</button>
       </div>
     </div>
     <div class="cmd-divider">
       <div class="sublabel" style="margin-bottom:6px">Factory Reset</div>
       <div class="form-row">
-        <label style="color:var(--text-muted);width:auto;margin-right:8px"><input type="checkbox" id="reset-keep-wifi" style="margin-right:4px">Keep WiFi</label>
-        <label style="color:var(--text-muted);width:auto"><input type="checkbox" id="reset-keep-mqtt" style="margin-right:4px">Keep MQTT</label>
+        <input type="checkbox" id="reset-keep-wifi" checked><label for="reset-keep-wifi" style="width:auto;cursor:pointer">Keep WiFi</label>
+        <input type="checkbox" id="reset-keep-mqtt" checked><label for="reset-keep-mqtt" style="width:auto;cursor:pointer">Keep MQTT</label>
         <button class="btn danger" onclick="doFactoryReset()" style="margin-top:6px">Factory Reset</button>
       </div>
     </div>
@@ -354,9 +361,15 @@ progress{accent-color:var(--accent);width:100%;height:6px;display:none;margin-to
   <!-- Utils -->
   <section id="utils-section" class="draggable-section" draggable="true">
     <h2>Utils</h2>
-    <div class="sublabel" style="margin-bottom:8px">I2C Scanner</div>
-    <button class="btn" onclick="runI2cScan()">Scan I2C Bus</button>
-    <div id="i2c-result" style="margin-top:8px;font-size:12px;min-height:20px"></div>
+    <div class="sublabel" style="margin:8px 0">File System</div>
+    <div class="form-row" style="margin-top:8px">
+      <button class="btn" onclick="listFiles()">List Files</button>
+      <input type="text" id="fs-filename" placeholder="filename.txt" style="flex:1">
+      <button class="btn" onclick="readFile()">Read File</button>
+      <button class="btn" onclick="saveFile()">Save File</button>
+      <button class="btn" onclick="deleteFile()" style="background:#dc3545">Delete File</button>
+    </div>
+    <textarea id="fs-result" spellcheck="false" style="margin-top:8px;font-size:12px;min-height:48px;white-space:pre-wrap;font-family:monospace;resize:vertical"></textarea>
   </section>
 
   <!-- Features -->
@@ -449,6 +462,9 @@ function loadState() {
       
       ignCmdOn = !!d.ignoreCmd;
       document.getElementById('ign_cmd-btn').checked = ignCmdOn;
+
+      narodmonOn = !!d.narodmon;
+      document.getElementById('narodmon-btn').checked = narodmonOn;
 
       if (d.teleInterval !== undefined) document.getElementById('tele-interval-select').value = String(d.teleInterval);
       if (d.onTime !== undefined)       document.getElementById('on-time-select').value = String(d.onTime);
@@ -814,6 +830,12 @@ function toggleIgnCmd() {
   postJson('/api/cmd', {ignoreCmd: ignCmdOn}, 'cmd-msg');
 }
 
+var narodmonOn = false;
+function toggleNarodmon() {
+  narodmonOn = !narodmonOn;
+  postJson('/api/cmd', {narodmon: narodmonOn}, 'cmd-msg');
+}
+
 function setTeleInterval() {
   var val = parseInt(document.getElementById('tele-interval-select').value, 10);
   document.getElementById('s-tele').textContent = val + ' min'; //Одновременно меняем значение s-tele
@@ -934,6 +956,48 @@ function runI2cScan() {
     .catch(function(){el.innerHTML='<span class="err">Scan failed</span>';});
 }
 
+function listFiles() {
+  fetch('/api/fs/list')
+    .catch(function(){});
+}
+
+function readFile() {
+  var name = document.getElementById('fs-filename').value.trim();
+  fetch('/api/fs/read?file=' + encodeURIComponent(name))
+    .catch(function(e){});
+}
+
+function saveFile() {
+  var name = document.getElementById('fs-filename').value.trim();
+  var el = document.getElementById('fs-result');
+  var content = el.value;
+
+  fetch('/api/fs?file=' + encodeURIComponent(name), {
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain'},
+    body: content
+  })
+    .finally(function() {
+      // Выполняется всегда, независимо от успеха или ошибки запроса
+      listFiles();
+    })
+    .catch(function(e) {
+      // Ошибку можно залогировать, но список всё равно обновится в finally
+    });
+}
+
+function deleteFile() {
+  var name = document.getElementById('fs-filename').value.trim();
+  if (!confirm('Delete file: ' + name + '?')) { return; }
+  fetch('/api/fs?file=' + encodeURIComponent(name), {
+    method: 'DELETE'
+  })
+    .finally(function() {
+      listFiles();
+    })
+    .catch(function(e){});
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function postJson(url, body, msgId) {
   fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
@@ -977,6 +1041,21 @@ function connectWs() {
   ws.onerror = function(){ ws.close(); };
   ws.onmessage = function(evt){
     var d; try{d=JSON.parse(evt.data);}catch(e){return;}
+
+    // Handle file system responses
+    if (d.hasOwnProperty('files')) {
+      var el = document.getElementById('fs-result');
+      if (!d.mounted) { return; }
+      var files = d.files || [];
+      el.value = files.map(function(f){ return f.name + ' (' + f.size + ' bytes)'; }).join('\n');
+      return;
+    }
+    if (d.hasOwnProperty('fsContent')) {
+      var el = document.getElementById('fs-result');
+      el.value = d.fsContent;
+      return;
+    }
+
     if (d.l === 'otapct') {
       var pct = parseInt(d.m);
       var prog = document.getElementById('ota-progress');
@@ -986,7 +1065,7 @@ function connectWs() {
       d = {t: d.t, m: 'OTA: ' + pct + '%', l: 'info'};
     }
     // Handle toggle state broadcast from handleCommand
-    if (d.hasOwnProperty('maintenance') || d.hasOwnProperty('deepSleep') || d.hasOwnProperty('debugLog') || d.hasOwnProperty('ignoreCmd') || d.hasOwnProperty('teleIntervalM') || d.hasOwnProperty('onTime')) {
+    if (d.hasOwnProperty('maintenance') || d.hasOwnProperty('deepSleep') || d.hasOwnProperty('debugLog') || d.hasOwnProperty('ignoreCmd') || d.hasOwnProperty('narodmon') || d.hasOwnProperty('teleIntervalM') || d.hasOwnProperty('onTime')) {
       if (d.hasOwnProperty('debugLog')) {
         debugOn = !!d.debugLog;
         document.getElementById('debug-btn').checked = debugOn;
@@ -1002,6 +1081,10 @@ function connectWs() {
       if (d.hasOwnProperty('ignoreCmd')) {
         ignCmdOn = !!d.ignoreCmd;
         document.getElementById('ign_cmd-btn').checked = ignCmdOn;
+      }
+      if (d.hasOwnProperty('narodmon')) {
+        narodmonOn = !!d.narodmon;
+        document.getElementById('narodmon-btn').checked = narodmonOn;
       }
       if (d.hasOwnProperty('teleIntervalM')) {
         var val = String(d.teleIntervalM);

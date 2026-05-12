@@ -120,6 +120,7 @@ void setup() {
         // Restore ignoreCmd mode before web server starts
         setIgnoreCmdMode(hw.ignoreCmd);
         setDeepSleepMode(hw.deepSleep);
+        setNarodmonMode(hw.narodmon);
         STATE_UNLOCK();
     }
 

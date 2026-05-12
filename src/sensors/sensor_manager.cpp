@@ -1,3 +1,5 @@
+#include "narodmon.h"
+
 #include "sensor_manager.h"
 #include "bme280_sensor.h"
 #include "sht30_sensor.h"
@@ -256,8 +258,8 @@ static void doSensorRead() {
         SensorReading r = {};
         r.deviceId = chipId;
         if (!sensors[i]->read(r)) continue;
-        strncpy(s_lastData[i], r.data, SENSOR_DATA_MAX - 1);
-
+        strncpy(s_lastData[i], r.data, SENSOR_DATA_MAX - 1); // {"Temp":25.30,"Hum":65.0,"Press":1013.25}
+logMessageFmt("1","%s",s_lastData[i]);
         // r.data = {"k":v,...} — strip braces and append inner content
         size_t dlen = strlen(r.data);
         if (dlen < 3) continue;                     // empty object, skip
@@ -272,7 +274,7 @@ static void doSensorRead() {
             merged[mlen]   = '\0';
             avail--;
         }
-        strncat(merged, inner, (ilen < avail) ? ilen : avail);
+        strncat(merged, inner, (ilen < avail) ? ilen : avail); //Добавление "Temp":25.30,"Hum":65.0,"Press":1013.25
 
         if (!hasData) firstMsgType = r.msgType;
         first   = false;
@@ -282,7 +284,9 @@ static void doSensorRead() {
 
     size_t mlen = strlen(merged);
     merged[mlen]     = '}';
-    merged[mlen + 1] = '\0';
+    merged[mlen + 1] = '\0'; //Пакет с данными датчиков
+logMessageFmt("2","%s",merged);
+    if (getNarodmonMode()) {send_to_narodmon(merged);}
 
     if (!hasData) return;
 
